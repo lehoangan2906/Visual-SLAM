@@ -12,7 +12,13 @@ def process_frame(img):
     img = cv2.resize(img, (width//4, height//4)) # Downscale the image
 
     # Detect the keypoints and descriptors in the frame with ORB
-    kp1, des1 = orb.detectAndCompute(img, None)
+    kp, des = orb.detectAndCompute(img, None)
+
+    # Draw the keypoints on the frame
+    for p in kp:
+        x, y = p.pt
+        x, y = int(x), int(y)
+        cv2.circle(img, (x, y), 5, (0, 255, 0), 1)
 
     # Display the resulting frame
     cv2.imshow("frame", img)
