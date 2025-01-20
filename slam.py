@@ -11,7 +11,20 @@ class FeatureExtractor(object):
         self.orb = cv2.ORB_create()
 
     def extract(self, img):
-        return cv2.goodFeaturesToTrack(np.mean(img, axis=2).astype(np.uint8), maxCorners=800, qualityLevel=0.01, minDistance=3)
+        # Use OpenCV goodFeaturesToTrack to detect strong corners (keypoints)
+        feats = cv2.goodFeaturesToTrack(
+            np.mean(img, axis=2).astype(np.uint8), # Convert the image to grayscale
+            maxCorners=3000,                       # Maximum number of corners to return
+            qualityLevel=0.01,                     # Minimum quality of corners
+            minDistance=3                          # Minimum Euclidean distance between corners
+        )
+
+        # Convert detected corners to KeyPoint objects
+        kps = [cv2.KeyPoint(x=f[0][0], y = f[0][1], size=20) for f in feats]    # Extract the x and y coordinates of the corner then assign a fixed size of 20 pixels for each keypoint.
+
+        # Compute the keypoint descriptor with ORB
+        des = self.orb.compute(img, kps)
+        return kps, des
 
 
 fe = FeatureExtractor()
@@ -19,11 +32,11 @@ fe = FeatureExtractor()
 def process_frame(img):
     img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4)) # Downscale the image
 
-    kp = fe.extract(img)
+    kps, des = fe.extract(img)
 
     # Draw the keypoints on the frame
-    for p in kp:
-        x, y = map(lambda x: int(round(x)), p[0])
+    for p in kps:
+        x, y = map(lambda x: int(round(x)), p.pt)
         cv2.circle(img, (x, y), color=(0, 255, 0), radius=3)
 
     cv2.imshow("frame", img)
