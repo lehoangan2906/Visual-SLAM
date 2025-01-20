@@ -40,7 +40,7 @@ I employed a feature-based SLAM approach, leveraging OpenCV's powerful image pro
 
     - Used for efficient matrix operations and handling image data
 
-##Challenges and Solutions
+## Challenges and Solutions
 
 1. Keypoint Distribution:
 
@@ -60,7 +60,7 @@ I employed a feature-based SLAM approach, leveraging OpenCV's powerful image pro
 
     - Solution: Using feature descriptors (ORB, SIFT, SURF) to ensure accurate matching.
 
-##How to Run the Project
+## How to Run the Project
 1. Install the required dependencies:
 ```bash
 pip3 install opencv-python numpy
