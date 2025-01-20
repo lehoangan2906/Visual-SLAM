@@ -1,11 +1,17 @@
-purpose: build something that will recover a map from a video recording a car moving (on dash cam)
+# SLAM-Based Map Recovery from Dash Cam Videos
 
-Video has many trees → good features to track frame-by-frame
+Purpose: This project aims to `recover a map` from a video recorded using a dash cam mounted on a moving car. The goal is to implement a `feature-based SLAM` system that tracks features across consecutive video frames to reconstruct a map of the environment.
 
-use OpenCV cv2 for displaying the video
+## Approach
+I employed a feature-based SLAM approach, leveraging OpenCV's powerful image processing and computer vision capabilities. The primary steps involved in the project are:
 
-this is a feature-based slam → track the features from frame to frame
+1. Video Processing and Display:
+    - Using OpenCV (`cv2`) to read and display video frames for visualization.
+    - Processing each frame to extract relevant features for tracking.
 
-use OpenCV orb features to identify key-points and compute their descriptions in each frame
+2. Feature Extraction:
+    - Due to the presence of many trees in the video, which provide good nature features, I focus on tracking frame-to-frame features efficiently.
+    - ORB (Oriented FAST and Rotated BRIEF) is used to identify keypoints and compute their descriptors in each frame.
+    - The default ORB keypoint distribution is often poor (clustering in certain areas), leading to a need for a custom feature extraction strategy.
 
-the default setting of ORB output key-points kind of crappy because they are not well distributed across the frame. → Need to write custom orb extractor. → by breaking the frame into a grid and then detect and compute the key-points in each grid, then shift their coordinates to the image global coordinate system. → The newly detected key-points are still clustered → need to choose good features to track using OpenCV goodFeaturesToTrack. → goodFeatureToTrack only returns corners’ locations, whereas SLAM algorithms require **descriptors** (such as SIFT, ORB, or SURF) to match features between frames robustly.
+
