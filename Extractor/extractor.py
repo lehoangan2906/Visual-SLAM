@@ -6,14 +6,14 @@ class Extractor(object):
     GY = 6
 
     def __init__(self):
-        self.orb = cv2.ORB_create()
-        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        self.orb = cv2.ORB_create(100)
+        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING)
         self.last = None
 
     def extract(self, img):
         # Detection
         # =========
-        # Use OpenCV goodFeaturesToTrack to detect strong corners (keypoints)
+        # Detect strong corners (features)
         feats = cv2.goodFeaturesToTrack(
             np.mean(img, axis=2).astype(np.uint8), # Convert the image to grayscale
             maxCorners=3000,                       # Maximum number of corners to return
@@ -31,12 +31,15 @@ class Extractor(object):
 
         # Matching
         # ========
-        matches = None
+        ret = []
         # Match descriptors with the previous frame if available
         if self.last is not None and self.last["des"] is not None:
-            matches = self.bf.match(des, self.last["des"]) # Match the descriptors of the current frame with the descriptors of the previous frame
+            matches = self.bf.knnMatch(des, self.last["des"], k = 2) # Match the descriptors of the current frame with the descriptors of the previous frame
+            for m, n in matches:
+                if m.distance < 0.75 * n.distance:
+                    ret.append((kps[m.queryIdx], self.last["kps"][m.trainIdx]))
 
-        # Store the current frame's keypoints and descriptors
+        # Store the current frame's keypoints and descriptors for use in the next frame
         self.last = {"kps": kps, "des": des}
 
-        return kps, des, matches
+        return ret
