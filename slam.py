@@ -11,7 +11,7 @@ fe = Extractor()
 def process_frame(img):
     img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4)) # Downscale the image
 
-    kps, des, matches = fe.extract(img)
+    matches = fe.extract(img) # Extract keypoints and descriptors from the frame
 
     if matches is None:
         return

@@ -6,7 +6,7 @@ class Extractor(object):
     GY = 6
 
     def __init__(self):
-        self.orb = cv2.ORB_create(100)
+        self.orb = cv2.ORB_create()
         self.bf = cv2.BFMatcher(cv2.NORM_HAMMING)
         self.last = None
 
@@ -31,7 +31,7 @@ class Extractor(object):
 
         # Matching
         # ========
-        ret = []
+        ret = [] 
         # Match descriptors with the previous frame if available
         if self.last is not None and self.last["des"] is not None:
             matches = self.bf.knnMatch(des, self.last["des"], k = 2) # Match the descriptors of the current frame with the descriptors of the previous frame
