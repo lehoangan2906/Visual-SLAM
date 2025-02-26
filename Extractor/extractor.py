@@ -18,7 +18,7 @@ class Extractor(object):
             np.mean(img, axis=2).astype(np.uint8), # Convert the image to grayscale
             maxCorners=3000,                       # Maximum number of corners to return
             qualityLevel=0.01,                     # Minimum quality of corners
-            minDistance=3                          # Minimum Euclidean distance between corners
+            minDistance=3                           # Minimum Euclidean distance between corners
         )
 
         # Extraction
