@@ -88,7 +88,7 @@ self.last = {"kps": kps, "des": des}
 - The retained descriptors allow **frame** `t+1` **to be compared with frame** `t`, forming a continuous tracking process.
 
 ---
-# 🔗 How This Enables Frame-by-Frame Tracking
+### 🔗 How This Enables Frame-by-Frame Tracking
 The entire pipeline works together **to track keypoints from frame to frame**;
 1. Frame `t` (first frame):
     - Detect features (`goodFeaturesToTrack`)
@@ -110,7 +110,7 @@ The entire pipeline works together **to track keypoints from frame to frame**;
     - **Feature matches tell us how points move across frames**, revealing motion patterns.
 
 ---
-# 🔍 Summary (What this code actually does for Tracking)
+### 🔍 Summary (What this code actually does for Tracking)
 1. Find feature points in each frame that are likely to remain stable.
 2. Encodes feature points using ORB descriptors to ensure they can be recognized later.
 3. Matches feature points between frames to track where they move.
