@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+from skimage.measure import ransac
+from skimage.transform import FundamentalMatrixTransform
 
 class Extractor(object):
     GX = 8
@@ -16,7 +18,7 @@ class Extractor(object):
         # Detect strong corners (features)
         feats = cv2.goodFeaturesToTrack(
             np.mean(img, axis=2).astype(np.uint8), # Convert the image to grayscale
-            maxCorners=3000,                       # Maximum number of corners to return
+            maxCorners=2000,                       # Maximum number of corners to return
             qualityLevel=0.01,                     # Minimum quality of corners
             minDistance=3                           # Minimum Euclidean distance between corners
         )
@@ -37,7 +39,35 @@ class Extractor(object):
             matches = self.bf.knnMatch(des, self.last["des"], k = 2) # Match the descriptors of the current frame with the descriptors of the previous frame
             for m, n in matches:
                 if m.distance < 0.75 * n.distance:
-                    ret.append((kps[m.queryIdx], self.last["kps"][m.trainIdx]))
+                    kp1 = kps[m.queryIdx].pt
+                    kp2 = self.last["kps"][m.trainIdx].pt
+                    ret.append((kp1, kp2))
+
+        # Filter
+        # ========
+        if len(ret) > 0:
+            ret = np.array(ret)
+            print(ret.shape)
+
+            if len(ret) >= 8:
+                try:
+                    # Apply RANSAC to filter out outliers
+                    model, inliers = ransac((ret[:, 0], ret[:, 1]), 
+                                            FundamentalMatrixTransform,
+                                            min_samples=8,
+                                            residual_threshold=0.05,  # Loosen threshold
+                                            max_trials=100)
+
+                    if inliers is None or np.sum(inliers) < 8:  
+                        print(f"RANSAC rejected too many matches: {np.sum(inliers)} (Skipping RANSAC)")
+                    else:
+                        ret = ret[inliers]
+                except ValueError as e:
+                    print(f"RANSAC failed: {e} (Skipping RANSAC)")
+
+            else:
+                print(f"Not enough matches for RANSAC: {len(ret)} (Skipping RANSAC)")
+
 
         # Store the current frame's keypoints and descriptors for use in the next frame
         self.last = {"kps": kps, "des": des}

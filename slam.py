@@ -25,11 +25,10 @@ def process_frame(img):
         cv2.circle(img, (x, y), color=(0, 255, 0), radius=3) # Draw green keypoints
 
     # Draw matches between the current and previous frame
-    if matches:
-        for p1, p2 in matches:
-            x1, y1 = map(lambda coord: int(round(coord)), p1.pt)
-            x2, y2 = map(lambda coord: int(round(coord)), p2.pt)
-            cv2.line(img, (x1, y1), (x2, y2), color=(255, 0, 0)) # Draw blue lines between the keypoints
+    for p1, p2 in matches:
+        x1, y1 = map(lambda coord: int(round(coord)), p1)
+        x2, y2 = map(lambda coord: int(round(coord)), p2)
+        cv2.line(img, (x1, y1), (x2, y2), color=(255, 0, 0)) # Draw blue lines between the keypoints
 
     # Display the processed frame
     cv2.imshow("frame", img)
