@@ -101,7 +101,7 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
             - Computationally expensive as the observed output video is so slow. (not ideal for real-time application).
 
     - **goodFeaturesToTrack**:
-        ![Good Features to Track](images/goodFeaturesToTrack)
+        ![Good Features to Track](images/goodFeaturesToTrack.png)
         - **Observation**: The detected corners are **concentrated in high-contrast areas**, but a lot of weak or unnecessary points are detected when too many are allowed.
         - **Strengths**:
             - Fast and efficient for motion tracking.
