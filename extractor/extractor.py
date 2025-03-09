@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 
 # Extract feature using ORB (fast, suitable for real-time)
 def extract_orb_features(img):
@@ -20,6 +19,12 @@ def extract_sift_features(img):
     img_keypoints = cv2.drawKeypoints(img, keypoints, None, color=(0, 255,0))
 
     return img_keypoints
+
+# Extract feature using AKAZE (Faster than SIFT but slower than ORB)
+def extract_akaze_features(img):
+    akaze = cv2.AKAZE_create()
+    keypoints, descriptors = akaze.detectAndCompute(img, None)
+    return cv2.drawKeypoints(img, keypoints, None, (0, 255, 0))
 
 # Extract feature using cv2.GoodFeaturesToTrack
 # Find the strongest corners in an image

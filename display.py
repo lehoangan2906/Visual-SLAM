@@ -46,9 +46,12 @@ def process_frame(img):
 
     # Extract and Visualize features using SIFT
     # img_with_features = extract_sift_features(img)
+    
+    # Extract and Visualize features in each frame using AKAZE
+    img_with_features = extract_akaze_features(img)
 
     # Extract and Visualize features in each frame using goodFeaturesToTrack
-    img_with_features = extract_good_features(img)
+    # img_with_features = extract_good_features(img)
 
     # Display the processed frame
     cv2.imshow("frame", img_with_features)

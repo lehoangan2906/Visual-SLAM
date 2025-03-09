@@ -110,3 +110,13 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
         - **Weaknesses**:
             - Not scale or rotation-invariant.
             - Can sometimes miss corners if parameters are not well-tuned.
+
+    - **AKAZE (Accelerated-KAZE)**:
+        ![AKAZE](images/AKAZE.png)
+        - **Observation**: The detected keypoints are somewhat similar SUFT but with **faster computation time**.
+        - **Strengths**:
+            - Better keypoints detection.
+            - Scale and rotation-invariant.
+        - **Weaknesses**:
+            - Slower than ORB.
+            - Not as precise as SIFT.
