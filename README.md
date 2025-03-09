@@ -79,7 +79,7 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
 
 - **Experiments and Evaluations**:
     - **ORB (Oriented FAST and Rotated BRIEF)**:
-        ![ORB Feature Detection][images/ORB.png]
+        ![ORB Feature Detection](images/ORB.png)
         - **Observation**: The detected keypoints are spread out but seem to focus on strong edges, particularly around cars and lane markings.
         - **Strengths**:
             - Fast and efficient for real-time application.
@@ -101,7 +101,7 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
             - Computationally expensive as the observed output video is so slow. (not ideal for real-time application).
 
     - **goodFeaturesToTrack**:
-        ![Good Features to Track](iamges/goodFeaturesToTrack)
+        ![Good Features to Track](images/goodFeaturesToTrack)
         - **Observation**: The detected corners are **concentrated in high-contrast areas**, but a lot of weak or unnecessary points are detected when too many are allowed.
         - **Strengths**:
             - Fast and efficient for motion tracking.
