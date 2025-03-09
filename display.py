@@ -1,5 +1,5 @@
 import cv2
-
+from extractor.extractor import *
 
 # For displaying the video
 def play_video(video_path):
@@ -41,6 +41,15 @@ def process_frame(img):
     # Downscale the frame for reducing computational loads
     img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4))
 
+    # Extract and Visualize features using ORB 
+    # img_with_features = extract_orb_features(img)
+
+    # Extract and Visualize features using SIFT
+    # img_with_features = extract_sift_features(img)
+
+    # Extract and Visualize features in each frame using goodFeaturesToTrack
+    img_with_features = extract_good_features(img)
+
     # Display the processed frame
-    cv2.imshow("frame", img)
+    cv2.imshow("frame", img_with_features)
     cv2.waitKey(1)

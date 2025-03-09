@@ -65,4 +65,46 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
    |
    |_6.2. 3D Visualization
 ```
+---
+## Main Content
 
+### 1. Input Acquisition and Preprocessing
+
+    - **Why It’s needed?** SLAM starts with raw sensory data  — here, a sequence of images from a monocular camera.  These images provide the visual information needed to detect landmarks and estimate motion. Preprocessing ensures the data is in a usable format (e.g., manageable resolution, grayscale for feature detection)
+    - **Method**:
+        - Used OpenCV’s `cv2.VideoCapture` to read frames from a pre-recorded video file.
+        - The script `main.py` accepts a video path and parse it into the functions inside `display.py` in order to process each frame, detect keypoints, match them, and then display them out.
+        - Tried ORB, SIFT, and cv2.goodFeaturesToTrack for feature extraction.
+        - Frames were downscaled to reduce computational load.
+    - **Experiments and Evaluations**:
+        - **ORB (Oriented FAST and Rotated BRIEF)**:
+            ![ORB Feature Detection][images/ORB.png]
+            - **Observation**: The detected keypoints are spread out but seem to focus on strong edges, particularly around cars and lane markings.
+            - **Strengths**:
+                - Fast and efficient for real-time application.
+                - Detects rotation-invariant keypoints.
+                - Works well on high-contrast regions.
+            - **Weaknesses**:
+                - Not the best at detecting finer details.
+                - Not scale-invariant (keypoints might change at different distances)
+
+        - **SIFT (Scale-Invariant Feature Transform)**
+            ![SIFT Feature Detection](images/SIFT.png)
+            - **observation**: Keypoints appear to be **more distributed across the image**, especially in textured areas like trees and road signs.
+            - **Strengths**:
+                - Excellent at detecting **fine-grained details**.
+                - Scale and rotation-invariant.
+                - Best for **matching features across multiple frames**.
+            - **Weaknesses**:
+                - Computationally expensive as the observed output video is so slow. (not ideal for real-time application).
+
+        - **goodFeaturesToTrack**:
+            ![Good Features to Track](iamges/goodFeaturesToTrack)
+            - **Observation**: The detected corners are **concentrated in high-contrast areas**, but a lot of weak or unnecessary points are detected when too many are allowed.
+            - **Strengths**:
+                - Fast and efficient for motion tracking.
+                - Works well with optical flow algorithms. 
+                - Tunable parameters for reducing false positives.
+            - **Weaknesses**:
+                - Not scale or rotation-invariant.
+                - Can sometimes miss corners if parameters are not well-tuned.
