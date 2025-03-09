@@ -1,5 +1,7 @@
 import cv2
 
+
+# For displaying the video
 def play_video(video_path):
     # Create VideoCapture object and read from input file
     cap = cv2.VideoCapture(video_path)
@@ -15,11 +17,14 @@ def play_video(video_path):
         ret, frame = cap.read()
         if ret:
             # Display the resulting frame
-            cv2.imshow('Frame', frame)
+            #cv2.imshow('Frame', frame)
 
             # Press 'Q' on keyboard to exit
-            if cv2.waitKey(25) & 0xFF == ord('q'):
-                break
+            #if cv2.waitKey(25) & 0xFF == ord('q'):
+            #    break
+
+            # Processing each frame and display them
+            process_frame(frame)
         else:
             break
 
@@ -28,3 +33,14 @@ def play_video(video_path):
 
     # Close all the frames
     cv2.destroyAllWindows()
+
+
+# For processing each frame
+def process_frame(img):
+
+    # Downscale the frame for reducing computational loads
+    img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4))
+
+    # Display the processed frame
+    cv2.imshow("frame", img)
+    cv2.waitKey(1)
