@@ -1,31 +1,10 @@
-import cv2
+#!/usr/bin/python3
 
+from display import play_video
 
-# Create VideoCapture object and read from input file
-cap = cv2.VideoCapture('videos/test.mp4')
+if __name__ == "__main__":
+    video_path = "videos/test.mp4"
 
-# Check if camera is opened successfully
-if (cap.isOpened() == False):
-    print("Error opening video file")
+    # Use the play_video function from display.py 
+    play_video(video_path)
 
-# Read until video is completed
-while(cap.isOpened()):
-    # Capture frame by frame
-    ret, frame = cap.read()
-    if ret == True:
-        # Display the resulting frame
-        cv2.imshow('Frame', frame)
-
-        # Presss 'Q' on keyboard to exit
-        if cv2.waitKey(25) & 0xFF == ord('q'):
-            break
-
-    # Break the loop
-    else: 
-        break
-
-# When everything done, release the VideoCapture object
-cap.release()
-
-# Closes all the frames
-cv2.destroyAllWindows()
