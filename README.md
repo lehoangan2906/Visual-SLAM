@@ -120,3 +120,45 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
         - **Weaknesses**:
             - Slower than ORB.
             - Not as precise as SIFT.
+
+### 2. Feature Detection and matching
+
+This step extracts keypoints and descriptors from video frames and matches them across consecutive frames to track movement, a critical foundation for estimating camera motion in the SLAM pipeline.
+
+**Detection**:
+
+- **Implementation Methods**: Several feature detection algorithms are tested in `extractor/extractor.py`:
+    - **AKAZE**: Chosen for its balance of speed and robustness. Uses `cv2.AKAZE_create()` to detect keypoints and compute binary descriptors.
+    - **ORB**: Fast and lightweight, using `cv2.ORB_create()`—suitable for real-time but less robust to scale/rotation changes.
+    - **SIFT**: Slower but highly robust (`cv2.SIFT_create()`), excels in varied lighting and perspectives.
+    - **GoodFeaturesToTrack**: Detects strong corners (`cv2.goodFeaturesToTrack`)—simple but the output are not so ‘high-quality’, also lacks descriptors.
+    
+- **Current Choice:** **AKAZE is selected** for its efficiency and binary descriptors, aligning with real-time SLAM needs while handling dashcam noise (e.g., blur, lighting shifts).
+
+- **AKAZE Details**:
+    - Generates **binary descriptors** — strings of bits (0s and 1s).
+    - Example: A descriptor might look like `101010...` (256 or 486 bits, depending on settings).
+    - **Why binary?** Fast to compare (using Hamming distance) and memory-efficient.
+
+**Matching:**
+
+- **Goal**: Match keypoints between frames to find correspondences (e.g., “This corner in frame 1 is here in frame 2”), enabling motion estimation.
+- **Approach**: Using OpenCV’s **Brute-Force Matcher** (`cv2.BFMatcher`) with `NORM_HAMMING` for AKAZE’s binary descriptors:
+    - **What is `BFMatcher`?**
+        - A brute-force matcher: Exhaustively checks all possible pairs of descriptors between two frames to find the most similar ones based on a distance metric.
+        - **Distance Metric**: Hamming Distance, specifically designed for binary data.
+    - **Hamming Distance**:
+        - Measures the number of positions where two binary strings differ.
+        - Example:
+            - Descriptor 1: `1010`.
+            - Descriptor 2: `1001`.
+            - Hamming Distance = 2 (differs at positions 3 and 4).
+        - Why using it? Because it’s efficient for binary descriptors (like AKAZE’s), counting bit mismatches directly.
+    - **1-NN Matching (`match()`):**
+        - Finds the nearest neighbor (smallest Hamming distance) for each descriptor in frame 1 from frame 2.
+        - Parameter `crossCheck = True` ensures mutual best matches — e.g., point A matches B, and B matches A back — reducing false positives.
+        - Simple and fast, but potentially give incorrect results due to affection of factors such as noise, light-quality, similar objects, etc,.
+    - **K-NN Matching (`knnMatch` );**
+        - Returns the top k nearest neighbors per descriptor.
+        - Applies **Lowe’s ratio test**: `ratio = best_distance / second_best_distance < 0.75` keeps only distinctive matches (e.g., best is much closer than second-best).
+        - Filters out ambiguous matches in noisy data (e.g., repetitive road lines or occluded objects).
