@@ -50,7 +50,7 @@ def extract_akaze_features(img1, img2):
     kp2, des2 = akaze.detectAndCompute(img2, None)
 
     # Create a matcher instance 
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
 
     # Compute the matches between the two frames' descriptors
     # good_matches = matcher.match(des1, des2) # Brute-force matching (1 Nearest Neighbor matching)
