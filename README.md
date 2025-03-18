@@ -121,6 +121,8 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
             - Slower than ORB.
             - Not as precise as SIFT.
 
+---
+
 ### 2. Feature Detection and matching
 
 This step extracts keypoints and descriptors from video frames and matches them across consecutive frames to track movement, a critical foundation for estimating camera motion in the SLAM pipeline.
