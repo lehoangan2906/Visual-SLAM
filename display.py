@@ -1,86 +1,126 @@
+#!usr/bin/python3
+
 import cv2
-from extractor.extractor import *
+import numpy as np 
+from extractor.extractor import extract_akaze_orb_features
 
-
-# Global variables to store the previous frame and its state
+# Global variable to store the previous frame and its state
 prev_img = None
-prev_kp = None
-prev_good_matches = None
 
 
 # For displaying the video
 def play_video(video_path):
-    # Create VideoCapture object and read from input file
+    """
+    Play the video from the given path, processing each frame to extract and display features.
+
+    Args:
+        video_path (str): The path to the video file.
+    """
+
+    # Create a VideoCapture object
     cap = cv2.VideoCapture(video_path)
 
-    # Check if camera is opened successfully
+
+    # Check if the video is opened successfully
     if not cap.isOpened():
-        print("Error opening video file")
+        print("Could not open the video file: ", video_path)
         return
 
-    # Read until the video is completed
+
+    # Read and process frames until the video ends
+    frame_count = 0
     while cap.isOpened():
-        # Capture frame by frame
         ret, frame = cap.read()
-        if ret:
-            # Display the resulting frame
-            #cv2.imshow('Frame', frame)
+        if not ret:
+            break       # End of video
 
-            # Press 'Q' on keyboard to exit
-            #if cv2.waitKey(25) & 0xFF == ord('q'):
-            #    break
-            
-            # Downscale the frame for reducing computational loads
-            frame = cv2.resize(frame, (frame.shape[1]//4, frame.shape[0]//4))
+        # Increment frame counter (for debugging or frame skipping if needed)
+        frame_count += 1
 
-            # Processing each frame and display them
-            process_frame(frame)
-        else:
+        # Downscale the frame to reduce computational load
+        frame = cv2.resize(frame, (frame.shape[1]//4, frame.shape[0]//4))
+
+        # Ensure the frame is in color (BGR) for visualization
+        if len(frame.shape) == 2:   # If grayscale, convert to BGR
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
+        # Process the frame (extract features and display)
+        process_frame(frame)
+
+        # Display the frame number for debugging (if needed)
+        # print("Frame: ", frame_count)
+
+        # Press 'q' to quit the video 
+        if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 
-    # When everything is done, release the VideoCapture object
+    # Release the video capture object and close all windows
     cap.release()
-
-    # Close all the frames
     cv2.destroyAllWindows()
 
 
-# For processing each frame
+# For processing each frames
 def process_frame(img):
-    global prev_img, prev_kp, prev_good_matches
+    """
+    Process a single frame to extract features, match with the previous frame, and 
+    display the results.
 
-    # Extract and Visualize features using ORB 
-    # img_with_features = extract_orb_features(img)
+    Args:
+        img (numpy.ndarray): The input frame to process.
+    """
 
-    # Extract and Visualize features using SIFT
-    # img_with_features = extract_sift_features(img)
-
-    # Extract and Visualize features in each frame using goodFeaturesToTrack
-    # img_with_features = extract_good_features(img)
+    global prev_img
 
 
     # Initialize on the first frame
     if prev_img is None:
-        prev_img = img
-        cv2.imshow("frame", prev_img)
+        prev_img = img.copy()   # Store the current frame for the next iteration
+        cv2.imshow("SLAM Output", prev_img)
         cv2.waitKey(1)
         return
 
-    
-    # Extract keypoints and matches for the current and previous frame
-    kp1, kp2, good_matches = extract_akaze_features(prev_img, img)
+    # Extract keypoints and matches between the previous and current frame
+    kp1, kp2, good_matches = extract_akaze_orb_featuers(prev_img, img)
 
-    # Draw the matches between two frames
+
+    # Debugging: Print keypoint and match counts
+    print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    print(f"Keypoints in img (kp2): {len(kp2)}")
+    print(f"Good matches: {len(good_matches)}")
+
+
+    # Visualize the results
     if good_matches and len(kp1) > 0 and len(kp2) > 0:
-        img_matches = cv2.drawMatches(prev_img, kp1, img, kp2, good_matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imshow("frame", img_matches)
+        # Create an output image for drawing matches
+        height = max(prev_img.shape[0], img.shape[0])
+        width = prev_img.shape[1] + img.shape[1]
+        output_img = np.zeros((height, width, 3), dtype=np.uint8)
+
+
+        # Draw the matches between the two frames on the output image
+        img_matches = cv2.drawMatches(
+            prev_img, kp1, img, kp2, good_matches, output_img,
+            matchColor = (0, 255, 0),   # Green lines for matches
+            singlePointColor = (0, 0, 255), # Red dots for keypoints
+            flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+                )
+
+        cv2.imshow("SLAM Output", img_matches)
+
     else:
-        cv2.imshow("frame", img)    # Fallback if no matches
+        # Fallback: display the current frame with keypoints if there are no matches
+        img_with_kp = img.copy()
+        if len(kp2) > 0:
+            img_with_kp = cv2.drawKeypoints(
+                    img, kp2, img_with_kp,
+                    flags = cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+                )
 
-    
-    # Update previous frame for the next iteration
-    prev_img = img
-    prev_kp = kp2
-    prev_good_matches = good_matches
+            cv2.imshow("SLAM Output", img_with_kp)
 
-    cv2.waitKey(1)
+        # Update the previous frame for the next iteration
+        prev_img = img.copy()
+
+if __name__ == "__main__":
+    video_path = "videos/test.mp4"
+    play_video(video_path)

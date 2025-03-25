@@ -142,6 +142,19 @@ This step extracts keypoints and descriptors from video frames and matches them 
     - Example: A descriptor might look like `101010...` (256 or 486 bits, depending on settings).
     - **Why binary?** Fast to compare (using Hamming distance) and memory-efficient.
 
+- **New Problem**: AKAZE failed to detect features in less textured regions like roads, paint strips, etc,. Making it hard to deliver high quality characteristics and uniform quantity and distribution over frames.
+
+<figure>
+    <img src="images/low\ quality.png" alt="Low Quality Features">
+    <figcaption>AKAZE fails to capture the features in low-texture regions, also the number of detected features is limited in higher region.</figcaption>
+</figure>
+
+- **Solution**: Combine AKAZE with another detector such as ORB that also produces binary descriptors to supplement.
+    - **AKAZE**: For high-quality features in textured regions.
+    - **ORB**: For additional features in less textured areas.
+
+-> By combining these detectors, the function aims to improve the number and quality of matches between consecutive frames in a dashcam video.
+
 **Matching:**
 
 - **Goal**: Match keypoints between frames to find correspondences (e.g., “This corner in frame 1 is here in frame 2”), enabling motion estimation.
