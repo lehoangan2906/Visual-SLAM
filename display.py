@@ -80,7 +80,7 @@ def process_frame(img):
         return
 
     # Extract keypoints and matches between the previous and current frame
-    kp1, kp2, good_matches = extract_akaze_orb_featuers(prev_img, img)
+    kp1, kp2, good_matches = extract_akaze_orb_features(prev_img, img)
 
 
     # Debugging: Print keypoint and match counts

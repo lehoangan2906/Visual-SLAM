@@ -69,8 +69,8 @@ def extract_akaze_features(img1, img2):
 # Extract feature using a combination of AKAZE and ORB
 def extract_akaze_orb_features(img1, img2):
     # Initialize AKAZE and ORB instances
-    akaze = cv2.AKAZE_create(threshold=0.001)   # threshold=0.001 is the best so far 
-    orb = cv2.ORB_create()
+    akaze = cv2.AKAZE_create(threshold=0.0005, diffusivity=cv2.KAZE_DIFF_PM_G2)  
+    orb = cv2.ORB_create(nfeatures=1000, scaleFactor=1.2, nlevels=12)
 
 
     # Detect keypoints and their corresponding descriptors with AKAZE
@@ -105,19 +105,23 @@ def extract_akaze_orb_features(img1, img2):
     # Create a matcher instance
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)  # Crosscheck only enabled when using 1-NN matcher
 
+    # Set the Lowe's ratio test threshold
+    lowe_thres = 0.75
 
     # Compute the matches between the two frames' descriptors
     # Match AKAZE descriptors separately
     good_matches_akaze = []
     if des1_akaze.size > 0 and des2_akaze.size > 0:
-        matches_akaze = matcher.knnMatch(des1_akaze, des2_akaze, k = 4)
-        good_matches_akaze = [m[0] for m in matches_akaze if len(m) == 2 and m[0].distance < 0.75 * m[1].distance]
+        matches_akaze = matcher.knnMatch(des1_akaze, des2_akaze, k = 2)
+        good_matches_akaze = [m[0] for m in matches_akaze if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+        # good_matches_akaze = [m[0] for m in matches_akaze if len(m) >= 2]   # no ratio test for debugging
 
     # Match ORB descriptors separately
     good_matches_orb = []
     if des1_orb.size > 0 and des2_orb.size > 0:
-        matches_orb = matcher.knnMatch(des1_orb, des2_orb, k = 4)
-        good_matches_orb = [m[0] for m in matches_orb if len(m) == 2 and m[0].distance < 0.75 * m[1].distance]
+        matches_orb = matcher.knnMatch(des1_orb, des2_orb, k = 2)
+        good_matches_orb = [m[0] for m in matches_orb if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+        #good_matches_orb = [m[0] for m in matches_orb if len(m) >= 2]   # no ratio test for debugging
 
     # Adjust ORB match indices to account for combined keypoint list
     num_akaze_kp1 = len(kp1_akaze)
@@ -128,5 +132,6 @@ def extract_akaze_orb_features(img1, img2):
 
     # Combine the matches
     good_matches = good_matches_akaze + good_matches_orb
+
 
     return kp1, kp2, good_matches
