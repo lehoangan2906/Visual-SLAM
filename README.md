@@ -145,7 +145,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
 - **New Problem**: AKAZE failed to detect features in less textured regions like roads, paint strips, etc,. Making it hard to deliver high quality characteristics and uniform quantity and distribution over frames.
 
 <figure>
-    <img src="images/low\ quality.png" alt="Low Quality Features">
+    <img src="images/low quality.png" alt="Low Quality Features">
     <figcaption>AKAZE fails to capture the features in low-texture regions, also the number of detected features is limited in higher region.</figcaption>
 </figure>
 
