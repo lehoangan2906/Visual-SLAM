@@ -3,83 +3,28 @@
 import cv2
 import numpy as np
 
-# Extract feature using ORB (fast, suitable for real-time)
-def extract_orb_features(img):
-    orb = cv2.ORB_create()
-    keypoints, descriptors = orb.detectAndCompute(img, None)
-
-    # Draw keypoints on the image
-    img_keypoints = cv2.drawKeypoints(img, keypoints, None, color=(0, 255, 0))
-
-    return img_keypoints
-
-
-# Extract feature using SIFT (slower but robust against scale, rotation, lighting changes)
-def extract_sift_features(img):
-    sift = cv2.SIFT_create()
-    keypoints, descriptors = sift.detectAndCompute(img, None)
-
-    img_keypoints = cv2.drawKeypoints(img, keypoints, None, color=(0, 255,0))
-
-    return img_keypoints
-
-
-# Extract feature using cv2.GoodFeaturesToTrack
-# Find the strongest corners in an image
-def extract_good_features(img, max_corners=500, quality_level=0.04, min_distance=10):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Detect the top 100 corners
-    corners = cv2.goodFeaturesToTrack(gray, maxCorners=max_corners, qualityLevel=quality_level, minDistance=min_distance)
-
-    if corners is not None:
-        corners = corners.astype(int)  # Convert to integer
-
-        for i in corners:
-            x, y = i.ravel()
-            cv2.circle(img, (x, y), 5, (0, 255, 0), -1)     # Draw circles on detected keypoints
-
-    return img
-
-
-# Extract feature using Accelerated KAZE (Faster than SIFT, slower than ORB but give the most stable keypoints output)
-def extract_akaze_features(img1, img2):
-    akaze = cv2.AKAZE_create(threshold=0.001)  # Create an AKAZE instance
-    
-    # Detect keypoints and their corresponding descriptors in each frame
-    kp1, des1 = akaze.detectAndCompute(img1, None)
-    kp2, des2 = akaze.detectAndCompute(img2, None)
-
-    # Create a matcher instance 
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-
-    # Compute the matches between the two frames' descriptors
-    # good_matches = matcher.match(des1, des2) # Brute-force matching (1 Nearest Neighbor matching)
-
-    # Sort by distance
-    # matches = sorted(matches, key=lambda x: x.distance)
-
-    matches = matcher.knnMatch(des1, des2, k=2) # Knn match for finding the top k matches for each descriptor instead of just 1.
-
-    good_matches = [m[0] for m in matches if len(m) == 2 and m[0].distance < 0.75 * m[1].distance]  # Lowe's ratio test to filter out best matches (check if the best match is significantly better than the second best match)
-    
-    return kp1, kp2, good_matches
-
 
 # Extract feature using a combination of AKAZE and ORB
 def extract_akaze_orb_features(img1, img2):
     # Initialize AKAZE and ORB instances
-    akaze = cv2.AKAZE_create(threshold=0.0005, diffusivity=cv2.KAZE_DIFF_PM_G2)  
-    orb = cv2.ORB_create(nfeatures=1000, scaleFactor=1.2, nlevels=12)
+    akaze = cv2.AKAZE_create(threshold=0.008, diffusivity=cv2.KAZE_DIFF_PM_G2)  
+    orb = cv2.ORB_create(nfeatures=1500)
 
+    
+    # Since the keypoints detected are clustering around the sky region, we need to create a mask to exclude that region (top 30% of the image)
+    #height, width = img1.shape[:2]
+    #mask = np.ones((height, width), dtype=np.uint8) * 255
+    #sky_height = int(height * 0.35)  # Mask the top of the image
+    #mask[:sky_height, :] = 0         # Set the top region to 0 (exclude)
+    # mask[sky_height:, :] = 0        # Set the bottom region to 0 (exclude)
 
     # Detect keypoints and their corresponding descriptors with AKAZE
-    kp1_akaze, des1_akaze = akaze.detectAndCompute(img1, None)
-    kp2_akaze, des2_akaze = akaze.detectAndCompute(img2, None)
+    kp1_akaze, des1_akaze = akaze.detectAndCompute(img1, mask=None)
+    kp2_akaze, des2_akaze = akaze.detectAndCompute(img2, mask=None)
 
     # Detect keypoints and descriptors with ORB
-    kp1_orb, des1_orb = orb.detectAndCompute(img1, None)
-    kp2_orb, des2_orb = orb.detectAndCompute(img2, None)
+    kp1_orb, des1_orb = orb.detectAndCompute(img1, mask=None)
+    kp2_orb, des2_orb = orb.detectAndCompute(img2, mask=None)
 
 
     # Handle empty descriptors
@@ -102,8 +47,9 @@ def extract_akaze_orb_features(img1, img2):
     if (des1_akaze.size == 0 or des1_orb.size == 0) or (des2_akaze.size == 0 or des2_orb.size == 0):
         return kp1, kp2, [] # Return keypoints and empty matches if no descriptors detected 
 
-    # Create a matcher instance
+    # Create a brute-force matcher instance
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)  # Crosscheck only enabled when using 1-NN matcher
+
 
     # Set the Lowe's ratio test threshold
     lowe_thres = 0.75
@@ -132,6 +78,24 @@ def extract_akaze_orb_features(img1, img2):
 
     # Combine the matches
     good_matches = good_matches_akaze + good_matches_orb
+    print(f"Total good matches before RANSAC: {len(good_matches)}")
 
+
+    # Apply RANSAC to filter matches (if enough matches exist)
+    if len(good_matches) > 10:
+        pts1 = np.array([kp1[m.queryIdx].pt for m in good_matches], dtype=np.float32)
+        pts2 = np.array([kp2[m.trainIdx].pt for m in good_matches], dtype=np.float32)
+
+        if pts1.shape[0] > 0 and pts2.shape[0] > 0:
+            _, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC, ransacReprojThreshold=3.0, confidence=0.95)
+            if mask is not None:
+                good_matches = [m for i, m in enumerate(good_matches) if mask[i]]
+            print(f"Good matches after RANSAC: {len(good_matches)}")
+
+
+    print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    print(f"Keypoints in img (kp2): {len(kp2)}")
+    print(f"Good matches: {len(good_matches)}")
 
     return kp1, kp2, good_matches
+

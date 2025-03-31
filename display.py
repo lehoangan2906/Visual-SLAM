@@ -69,12 +69,13 @@ def process_frame(img):
         img (numpy.ndarray): The input frame to process.
     """
 
-    global prev_img
+    global prev_img, prev_kp, prev_good_matches
 
 
     # Initialize on the first frame
     if prev_img is None:
-        prev_img = img.copy()   # Store the current frame for the next iteration
+        prev_img = img   # Store the current frame for the next iteration
+        prev_kp, _, _ = extract_akaze_orb_features(prev_img, prev_img)  # Dummy call
         cv2.imshow("SLAM Output", prev_img)
         cv2.waitKey(1)
         return
@@ -98,12 +99,13 @@ def process_frame(img):
 
 
         # Draw the matches between the two frames on the output image
-        img_matches = cv2.drawMatches(
-            prev_img, kp1, img, kp2, good_matches, output_img,
-            matchColor = (0, 255, 0),   # Green lines for matches
-            singlePointColor = (0, 0, 255), # Red dots for keypoints
-            flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-                )
+        #img_matches = cv2.drawMatches(
+        #    prev_img, kp1, img, kp2, good_matches, output_img,
+        #    matchColor = (0, 255, 0),   # Green lines for matches
+        #    singlePointColor = (0, 0, 255), # Red dots for keypoints
+        #    flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+        #        )
+        img_matches = cv2.drawMatches(prev_img, kp1, img, kp2, good_matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
         cv2.imshow("SLAM Output", img_matches)
 
@@ -118,8 +120,10 @@ def process_frame(img):
 
             cv2.imshow("SLAM Output", img_with_kp)
 
-        # Update the previous frame for the next iteration
-        prev_img = img.copy()
+    # Update the previous frame for the next iteration
+    prev_img = img.copy()   # Ensure a fresh copy for the next iteration
+    prev_kp = kp2
+    prev_good_matches = good_matches
 
 if __name__ == "__main__":
     video_path = "videos/test.mp4"
