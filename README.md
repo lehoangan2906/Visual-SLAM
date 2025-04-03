@@ -142,7 +142,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
     - Example: A descriptor might look like `101010...` (256 or 486 bits, depending on settings).
     - **Why binary?** Fast to compare (using Hamming distance) and memory-efficient.
 
-- **New Problem**: AKAZE failed to detect features in less textured regions like roads, paint strips, etc,. Making it hard to deliver high quality characteristics and uniform quantity and distribution over frames.
+- **Problem 1**: AKAZE failed to detect features in less textured regions like roads, paint strips, etc,. Making it hard to deliver high quality characteristics and uniform quantity and distribution over frames.
 
 <figure>
     <img src="images/low quality.png" alt="Low Quality Features">
@@ -153,12 +153,17 @@ This step extracts keypoints and descriptors from video frames and matches them 
     - **AKAZE**: For high-quality features in textured regions.
     - **ORB**: For additional features in less textured areas.
 
+- **Problem 2**: ORB and AKAZE combination successfully to detect much more keypoints, but still fails to capture keypoints in regions like road, lane-markings, curbs, etc,.
+
+- **Solution**: 
+    - Enhance Road Features with Preprocessing (e.g., `cv2.Canny` for edge detection) to highlight road lines and boundaries.
+    - Supplement with Road-specific detectors (e.g., `cv2.goodFeaturesToTrack`) to capture corners and edges in low-texture areas.
 -> By combining these detectors, the function aims to improve the number and quality of matches between consecutive frames in a dashcam video.
 
 **Matching:**
 
 - **Goal**: Match keypoints between frames to find correspondences (e.g., “This corner in frame 1 is here in frame 2”), enabling motion estimation.
-- **Approach**: Using OpenCV’s **Brute-Force Matcher** (`cv2.BFMatcher`) with `NORM_HAMMING` for AKAZE’s binary descriptors:
+- **Approach1**: Using OpenCV’s **Brute-Force Matcher** (`cv2.BFMatcher`) with `NORM_HAMMING` for AKAZE’s binary descriptors:
     - **What is `BFMatcher`?**
         - A brute-force matcher: Exhaustively checks all possible pairs of descriptors between two frames to find the most similar ones based on a distance metric.
         - **Distance Metric**: Hamming Distance, specifically designed for binary data.
@@ -177,3 +182,45 @@ This step extracts keypoints and descriptors from video frames and matches them 
         - Returns the top k nearest neighbors per descriptor.
         - Applies **Lowe’s ratio test**: `ratio = best_distance / second_best_distance < 0.75` keeps only distinctive matches (e.g., best is much closer than second-best).
         - Filters out ambiguous matches in noisy data (e.g., repetitive road lines or occluded objects).
+
+- **Approach 2**: Since Brute-Force Matching can be slow due to exhaustive search, we can leverage methods like FLANN (Fast Library for Approximate Nearest Neighbors) to approximate nearest neighbor.
+    - **FLANN**: A library for fast nearest neighbor search in high-dimensional spaces.
+    - **Mechanism**: It builds an index of descriptors (e.g., using LSH for binary descriptors) and searches for matches efficiently. For binary descriptors, it uses Hamming distance and parameters like `table_number=6` and `key_size=12` to optimize speed and accuracy.
+    - **Implementation**: 
+        - `cv2.FlannBasedMatcher` is used with parameters for AKAZE descriptors.
+        - Matches are filtered using Lowe’s ratio test.
+
+- **Reducing Outliers in Matches**:
+    - **RANSAC (Random Sample Consensus)**: A robust method to estimate parameters of a mathematical model from a set of observed data containing outliers.
+        - **Mechanism**: It iteratively samples a minimal subset of matches (e.g., 8 matches to compute the fundamental matrix), builds a model, and counts how many other matches (inliers) fit this model within a threshold (e.g., reprojection error < 3.0 pixels). The model with the most inliers is selected, and outliers are discarded. 
+
+    - **Lowe's ratio test**: 
+        - **Purpose**: Descriptor matching can produce ambiguous matches, especially in repetitive regions like trees or sky. Lowe’s ratio test filters out unreliable matches by ensuring the best match is significantly better than the second-best.
+        - **Mechanism**: For each keypoint, the matcher finds the two nearest descriptors in the other frame (using Hamming distance for binary descriptors like AKAZE/ORB). A match is kept if the distance to the closest descriptor is less than 0.65 times the distance to the second closest, indicating high confidence.
+        - **Example**: A keypoint’s closest match has a Hamming distance of 30, and the second closest is 50. Since 30 < 0.65 * 50 (32.5), the match is kept; otherwise, it’s discarded as ambiguous.
+
+<figure>
+    <img src="images/Final_Matching_result.png" alt="Final Matching Result">
+    <figcaption>The final matching result after combining AKAZE, ORB, and goodFeaturesToTrack. The quality and quantity of features and matches are way better than previously.</figcaption>
+</figure>
+
+**Pipeline Overview**:
+The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
+
+1. **Preprocessing**: Enhance road features in both frames using `preprocess_image` (CLAHE → Gaussian blur → Canny edges → blend with original image) to make lane markings and road textures more prominent.
+
+2. **Feature Extraction**:
+- Detect AKAZE keypoints and descriptors with a threshold of 0.0001 to capture detailed features.
+- Detect ORB keypoints and descriptors, limiting to 1500 features for efficiency.
+- Use `goodFeaturesToTrack` to detect road-specific corners (e.g., lane markings, curbs), computing ORB descriptors for these keypoints.
+
+3. `Keypoint Combination`: Concatenate AKAZE, ORB, and road keypoints into a single list per frame for unified processing.
+
+4. **Feature Matching**:
+- Match AKAZE, ORB, and road descriptors separately using FLANN (k=2 nearest neighbors) for speed.
+- Apply Lowe’s ratio test (threshold 0.65) to filter unreliable matches.
+- Adjust match indices to account for the combined keypoint lists.
+
+5. **Outlier Filtering**: Use RANSAC to compute the fundamental matrix and filter outlier matches, ensuring geometric consistency.
+
+6. **Return**: Output keypoints and good matches for further SLAM processing, such as motion estimation.
