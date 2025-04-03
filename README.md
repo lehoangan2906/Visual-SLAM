@@ -228,3 +228,6 @@ The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
 5. **Outlier Filtering**: Use RANSAC to compute the fundamental matrix and filter outlier matches, ensuring geometric consistency.
 
 6. **Return**: Output keypoints and good matches for further SLAM processing, such as motion estimation.
+
+---
+### 3. Camera Motion Estimation
