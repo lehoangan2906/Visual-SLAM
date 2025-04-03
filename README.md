@@ -149,7 +149,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
     <figcaption>AKAZE fails to capture the features in low-texture regions, also the number of detected features is limited in higher region.</figcaption>
 </figure>
 
-<br />
+<p>
 
 - **Solution**: Combine AKAZE with another detector such as ORB that also produces binary descriptors to supplement.
     - **AKAZE**: For high-quality features in textured regions.
@@ -206,7 +206,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
     <figcaption>The final matching result after combining AKAZE, ORB, and goodFeaturesToTrack. The quality and quantity of features and matches are way better than previously.</figcaption>
 </figure>
 
-<br />
+<p>
 
 **Pipeline Overview**:
 The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
