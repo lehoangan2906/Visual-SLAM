@@ -75,7 +75,25 @@ def process_frame(img):
     # Initialize on the first frame
     if prev_img is None:
         prev_img = img   # Store the current frame for the next iteration
-        prev_kp, _, _ = extract_akaze_orb_features(prev_img, prev_img)  # Dummy call
+        
+        # Since this is the first frame, we cannot call extract_akaze_orb_features funciton to  match an image with itself.
+        # Initialize prev_kp without matching (avoid dummy call to extract_akaze_orb_features)
+        akaze = cv2.AKAZE_create(threshold=0.008, diffusivity=cv2.KAZE_DIFF_PM_G2)
+        orb = cv2.ORB_create(nfeatures=1500)
+        
+        # Preprocess the image (same as in extract_akaze_orb_features)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
+        edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+        edges_3ch = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        img_preprocessed = cv2.addWeighted(img, 0.5, edges_3ch, 0.5, 0.0)
+
+        # Detect keypoints with AKAZE and ORB
+        kp_akaze, _ = akaze.detectAndCompute(img_preprocessed, None)
+        kp_orb, _ = orb.detectAndCompute(img_preprocessed, None)
+        prev_kp = kp_akaze + kp_orb if kp_akaze and kp_orb else (kp_akaze or kp_orb) or []
         cv2.imshow("SLAM Output", prev_img)
         cv2.waitKey(1)
         return
@@ -99,13 +117,13 @@ def process_frame(img):
 
 
         # Draw the matches between the two frames on the output image
-        #img_matches = cv2.drawMatches(
-        #    prev_img, kp1, img, kp2, good_matches, output_img,
-        #    matchColor = (0, 255, 0),   # Green lines for matches
-        #    singlePointColor = (0, 0, 255), # Red dots for keypoints
-        #    flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-        #        )
-        img_matches = cv2.drawMatches(prev_img, kp1, img, kp2, good_matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        img_matches = cv2.drawMatches(
+            prev_img, kp1, img, kp2, good_matches, output_img,
+            matchColor = (0, 255, 0),   # Green lines for matches
+            singlePointColor = (0, 0, 255), # Red dots for keypoints
+            flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+                )
+        # img_matches = cv2.drawMatches(prev_img, kp1, img, kp2, good_matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
         cv2.imshow("SLAM Output", img_matches)
 
