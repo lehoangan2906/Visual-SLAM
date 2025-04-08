@@ -262,7 +262,7 @@ So it's like:
 - Fundamental Matrix = "Hey, you moved, but I don't know how bug your camera lens is."
 - Essential Matrix = "Ah, I know how your camera works! Now I can really figure our how you moved".
 
-![image](images/Essential_Matrix.png)
+![image](images/Essential\ Matrix.png)
 
 **📷 What does a Calibrated Camera mean**:
 
