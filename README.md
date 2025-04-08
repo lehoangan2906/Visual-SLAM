@@ -232,7 +232,8 @@ The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
 ---
 ### 3. Camera Motion Estimation
 
-**🚗 The Problem and My Approach**:
+**🚗 My Approach**:
+
 Imagine your camera on a car taking pictures while driving on a highway. We want to figure out how the camera moves between two pictures -- did it go forward or turn? This is called **camera motion estimation**.
 
 To do this, we use the matching points from the previous step, and a special camera "cheat sheet' called the **intrinsic matrix (K)** to solve this puzzle and find the camera's **rotation** (how it turned) and **translation** (how it moved).
@@ -261,7 +262,10 @@ So it's like:
 - Fundamental Matrix = "Hey, you moved, but I don't know how bug your camera lens is."
 - Essential Matrix = "Ah, I know how your camera works! Now I can really figure our how you moved".
 
+![image](images/Essential_Matrix.png)
+
 **📷 What does a Calibrated Camera mean**:
+
 Imagine wearing glasses 📐. If you know the exact specs of your glasses (like lens strength, thickness), then you can correct your view and say exactly how far away things are.
 A **calibrated camera** is like a camera that has been measured very carefully—you know exactly:
 - The size of the sensor
@@ -270,7 +274,7 @@ A **calibrated camera** is like a camera that has been measured very carefully�
 
 This info lets you turn **pixel positions** into **real-world info**.
 
-So, 
+So, in summary:
 - **Calibrated Camera**: We know K (the camera’s settings, like its lens zoom and center point).
     - **Pros**: We can find the exact movement (rotation and translation).
     - **Cons**: We need K, which requires extra work to get.
@@ -279,6 +283,7 @@ So,
     - **Cons**: We can’t get the exact movement, just a rough idea.
 
 **🧠 How We Derive the Essential Matrix**:
+
 Okay, so to compute an **essential matrix** ($E$), we need `matchings` ($\mathbf{x}$'s) (pairs of corresponding keypoints in two consecutive frames), then derive it based on solving the equation $\mathbf{x_2^T}E\mathbf{x_1} = 0$.
 
 But the original x's values are in the **pixel coordinates**, we need to convert them into **normalized camera coordinates**, so we need the camera's` intrinsic matrix` to do so. 
