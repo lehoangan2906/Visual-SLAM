@@ -286,7 +286,7 @@ So, in summary:
 
 Okay, so to compute an **essential matrix** ($E$), we need `matchings` ($\mathbf{x}$'s) (pairs of corresponding keypoints in two consecutive frames), then derive it based on solving the equation $\mathbf{x_2^T}E\mathbf{x_1} = 0$.
 
-But the original x's values are in the **pixel coordinates**, we need to convert them into **normalized camera coordinates**, so we need the camera's` intrinsic matrix` to do so. 
+But the original x's values are in the **pixel coordinates**, we need to convert them into **normalized camera coordinates**, so we need the camera's` intrinsic matrix` to do so.<p> 
 Therefore, to derive the **essential matrix** that encodes the camera's pose between two consecutive frames, we need matchings (at least 8) as well as the camera's intrinsic matrix as inputs.
 
 -> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
