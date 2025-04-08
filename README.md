@@ -289,6 +289,6 @@ Okay, so to compute an **essential matrix** ($E$), we need `matchings` ($\mathbf
 But the original x's values are in the **pixel coordinates**, we need to convert them into **normalized camera coordinates**, so we need the camera's` intrinsic matrix` to do so. 
 Therefore, to derive the **essential matrix** that encodes the camera's pose between two consecutive frames, we need matchings (at least 8) as well as the camera's intrinsic matrix as inputs.
 
-After having the essential matrix, we can decompose it into the rotation and translation matrices using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
+-> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
 
 
