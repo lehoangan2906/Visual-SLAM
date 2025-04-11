@@ -291,7 +291,7 @@ Therefore, to derive the **essential matrix** that encodes the camera's pose bet
 
 -> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
 
-**⚖️ Estimating the Camera's Intrinsic Matrix **
+**⚖️ Estimating the Camera's Intrinsic Matrix**:
 
 To estimate the camera's `intrinsic matrix` (`K`) for our visual SLAM project, we need two approaches: 
 1. chessboard calibration,
