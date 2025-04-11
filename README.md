@@ -127,7 +127,7 @@ Pipeline: Twitch SLAM (Monocular SLAM Toy Implementation)
 
 This step extracts keypoints and descriptors from video frames and matches them across consecutive frames to track movement, a critical foundation for estimating camera motion in the SLAM pipeline.
 
-**Detection**:
+**<ins>Detection</ins>**:
 
 - **Implementation Methods**: Several feature detection algorithms are tested in `extractor/extractor.py`:
     - **AKAZE**: Chosen for its balance of speed and robustness. Uses `cv2.AKAZE_create()` to detect keypoints and compute binary descriptors.
@@ -162,7 +162,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
     - Supplement with Road-specific detectors (e.g., `cv2.goodFeaturesToTrack`) to capture corners and edges in low-texture areas.
 -> By combining these detectors, the function aims to improve the number and quality of matches between consecutive frames in a dashcam video.
 
-**Matching:**
+**<ins>Matching:</ins>**
 
 - **Goal**: Match keypoints between frames to find correspondences (e.g., “This corner in frame 1 is here in frame 2”), enabling motion estimation.
 - **Approach1**: Using OpenCV’s **Brute-Force Matcher** (`cv2.BFMatcher`) with `NORM_HAMMING` for AKAZE’s binary descriptors:
@@ -208,7 +208,7 @@ This step extracts keypoints and descriptors from video frames and matches them 
 
 <p>
 
-**Pipeline Overview**:
+**<ins>Pipeline Overview</ins>**:
 The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
 
 1. **Preprocessing**: Enhance road features in both frames using `preprocess_image` (CLAHE → Gaussian blur → Canny edges → blend with original image) to make lane markings and road textures more prominent.
@@ -232,7 +232,7 @@ The `extract_akaze_orb_features` function in `extractor.py` follows these steps:
 ---
 ### 3. Camera Motion Estimation
 
-**🚗 My Approach**:
+**🚗 <ins>My Approach</ins>**:
 
 Imagine your camera on a car taking pictures while driving on a highway. We want to figure out how the camera moves between two pictures -- did it go forward or turn? This is called **camera motion estimation**.
 
@@ -246,7 +246,7 @@ To do this, we use the matching points from the previous step, and a special cam
     - `R`: The rotation matrix, showing how the camera turned.
     - `t`: The translation vector, showing how the camera moved.
 
-**🧮 Two Important Kinds of Matrices**:
+**🧮 <ins>Two Important Kinds of Matrices</ins>**:
 - **Fundamental Matrix (F)**:
     - Use this when you **don't know the camera's internal details** (like lens size, sensor size, etc,.).
     - It tells you how points in one image relate to lines in the other.
@@ -264,7 +264,7 @@ So it's like:
 
 ![image](images/Essential_Matrix.png)
 
-**📷 What does a Calibrated Camera mean**:
+**📷 <ins>What does a Calibrated Camera mean</ins>**:
 
 Imagine wearing glasses 📐. If you know the exact specs of your glasses (like lens strength, thickness), then you can correct your view and say exactly how far away things are.
 A **calibrated camera** is like a camera that has been measured very carefully—you know exactly:
@@ -282,7 +282,7 @@ So, in summary:
     - **Pros**: Easier to start since we don’t need K.
     - **Cons**: We can’t get the exact movement, just a rough idea.
 
-**🧠 How We Derive the Essential Matrix**:
+**🧠 <ins>How We Derive the Essential Matrix</ins>**:
 
 Okay, so to compute an **essential matrix** ($E$), we need `matchings` ($\mathbf{x}$'s) (pairs of corresponding keypoints in two consecutive frames), then derive it based on solving the equation $\mathbf{x_2^T}E\mathbf{x_1} = 0$.
 
@@ -291,7 +291,7 @@ Therefore, to derive the **essential matrix** that encodes the camera's pose bet
 
 -> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
 
-**⚖️ Estimating the Camera's Intrinsic Matrix**:
+**⚖️  <ins>Estimating the Camera's Intrinsic Matrix</ins>**:
 
 To estimate the camera's `intrinsic matrix` (`K`) for our visual SLAM project, we need two approaches: 
 1. chessboard calibration,
@@ -303,6 +303,14 @@ The scene geometry approach exploits:
 
 1. `Straight lane lines` and `road edges` in highway footage, providing perspective cues.
 2. `Vanishing points`, where parallel lines (e.g., lane markings) converge, helping infer the focal length and principal point.
+
+<center>
+    $v_i^Twv_j = 0$   (for orthogonal vanishing points)
+</center>
+
+where $v_i, v_j$ are the vanishing points, and $w = (KK^T)^{-1}$ is the image of the absolute conic.
+
+Solving this above function, we can obtain K
 
 To construct `K`, we need:
 
