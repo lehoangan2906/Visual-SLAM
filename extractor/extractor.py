@@ -163,7 +163,7 @@ def extract_akaze_orb_features(img1, img2):
 
     # Combine the good matches from both AKAZE and ORB
     good_matches = good_matches_akaze + good_matches_orb + good_matches_road
-    print(f"Total good matches before RANSAC: {len(good_matches)}")
+    #print(f"Total good matches before RANSAC: {len(good_matches)}")
 
 
     # ==================== RANSAC to filter outliers ====================
@@ -175,13 +175,13 @@ def extract_akaze_orb_features(img1, img2):
             _, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC, ransacReprojThreshold=3.0, confidence=0.95)
             if mask is not None:
                 good_matches = [m for i, m in enumerate(good_matches) if mask[i]]
-            print(f"Good matches after RANSAC: {len(good_matches)}")
+            #print(f"Good matches after RANSAC: {len(good_matches)}")
 
 
     # ==================== Return the keypoints and good matches ====================
-    print(f"Keypoints in prev_img (kp1): {len(kp1)}")
-    print(f"Keypoints in img (kp2): {len(kp2)}")
-    print(f"Good matches: {len(good_matches)}")
+    #print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    #print(f"Keypoints in img (kp2): {len(kp2)}")
+    #print(f"Good matches: {len(good_matches)}")
 
 
     return kp1, kp2, good_matches

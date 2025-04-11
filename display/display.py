@@ -8,7 +8,7 @@ from extractor.extractor import extract_akaze_orb_features
 prev_img = None
 
 
-# For displaying the video
+# Reads a video, processes each frame, and displays the results.
 def play_video(video_path):
     """
     Play the video from the given path, processing each frame to extract and display features.
@@ -59,7 +59,7 @@ def play_video(video_path):
     cv2.destroyAllWindows()
 
 
-# For processing each frames
+# Extracts features, matches keypoints with the previous frame, and visualizes matches.
 def process_frame(img):
     """
     Process a single frame to extract features, match with the previous frame, and 
@@ -103,10 +103,9 @@ def process_frame(img):
 
 
     # Debugging: Print keypoint and match counts
-    print(f"Keypoints in prev_img (kp1): {len(kp1)}")
-    print(f"Keypoints in img (kp2): {len(kp2)}")
-    print(f"Good matches: {len(good_matches)}")
-
+    # print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    # print(f"Keypoints in img (kp2): {len(kp2)}")
+    # print(f"Good matches: {len(good_matches)}")
 
     # Visualize the results
     if good_matches and len(kp1) > 0 and len(kp2) > 0:
