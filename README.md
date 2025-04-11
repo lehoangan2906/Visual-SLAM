@@ -291,4 +291,40 @@ Therefore, to derive the **essential matrix** that encodes the camera's pose bet
 
 -> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
 
+**⚖️ Estimating the Camera's Intrinsic Matrix **
+
+To estimate the camera's `intrinsic matrix` (`K`) for our visual SLAM project, we need two approaches: 
+1. chessboard calibration,
+2. scene geometry. 
+
+Since we’re using a dash-cam video from the internet, we can’t access the physical camera for chessboard calibration. Instead, we use the scene geometry approach, which is less accurate than chessboard calibration but sufficient for our needs.
+
+The scene geometry approach exploits:
+
+1. `Straight lane lines` and `road edges` in highway footage, providing perspective cues.
+2. `Vanishing points`, where parallel lines (e.g., lane markings) converge, helping infer the focal length and principal point.
+
+To construct `K`, we need:
+
+1. `Focal length` (fx, fy): Determines the camera’s field of view.
+2. `Principal point` (cx, cy): The optical center of the image.
+
+The focal length calculation requires:
+
+1. Vanishing points from sampled frames (at least 2 per frame).
+2. The frame’s principal point.
+
+So the final pipeline to compute the intrinsic matrix is as follows:
+
+1. Sample a few random frames from the video (e.g., 10 frames, can be non-consecutive).
+2. Convert each frame to grayscale.
+3. Reduce noise using Gaussian blur.
+4. Detect edges using Canny edge detection.
+5. Detect lines using Hough Transform (cv2.HoughLinesP).
+6. Cluster lines into two groups per frame (near-vertical and near-horizontal) using a slope threshold of 45 degrees to ensure at least 2 vanishing points.
+7. Find vanishing points for each group by calculating line intersections, then average across all frames to get two final vanishing points.
+8. Assume the principal point is at the frame’s center (width/2, height/2).
+9. Calculate the focal length (fx = fy) using the vanishing points and principal point with the orthogonality constraint.
+10. Construct K as [[fx, 0, cx], [0, fy, cy], [0, 0, 1]].
+
 
