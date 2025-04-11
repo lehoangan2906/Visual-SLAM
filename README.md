@@ -304,9 +304,9 @@ The scene geometry approach exploits:
 1. `Straight lane lines` and `road edges` in highway footage, providing perspective cues.
 2. `Vanishing points`, where parallel lines (e.g., lane markings) converge, helping infer the focal length and principal point.
 
-<center>
-    $v_i^Twv_j = 0$   (for orthogonal vanishing points)
-</center>
+<div style="text-align: center;">
+$v_i^{\top}Tw_j = 0$ (for orthogonal vanishing points)
+</div>
 
 where $v_i, v_j$ are the vanishing points, and $w = (KK^T)^{-1}$ is the image of the absolute conic.
 
