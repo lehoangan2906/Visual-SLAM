@@ -363,7 +363,7 @@ So the final pipeline to compute the intrinsic matrix is as follows:
         - `kp1`, `kp2`: Lists of keypoints from two consecutive frames (e.g., 6200–7000 keypoints per frame).
         - `good_matches`: A list of matches (e.g., ~780 matches after RANSAC), where each match is a `cv2.DMatch` object linking a keypoint in `kp1` to a keypoint in `kp2`. Each match provides a pair of corresponding 2D points in pixel coordinates (e.g., (x1, y1) in frame 1 and (x2, y2) in frame 2).
     2. **Intrinsic Matrix (K)**:
-        - A $3 \times 3$ matrix [!matrix](https://latex.codecogs.com/png.latex?K = \begin{bmatrix}fx & 0 & cx\\ 0 & fy & cy\\ 0 & 0 & 1 \end{bmatrix}), where $fx, fy$ are the focal lengths in pixels, and $(cx, cy)$ is the principal point (image center). This matrix relates pixel coordinates to normalized camera coordinates.
+        - A $3 \times 3$ matrix [!matrix](https://latex.codecogs.com/png.latex?K=\begin{bmatrix}fx&0&cx\\0&fy&cy\\0&0&1\end{bmatrix}), where $fx, fy$ are the focal lengths in pixels, and $(cx, cy)$ is the principal point (image center). This matrix relates pixel coordinates to normalized camera coordinates.
 - **Goal: Compute the Essential Matrix (E)**:
 
 The essential matrix E is a 3x3 matrix that encodes the relative pose (rotation R and translation t) between two camera views, assuming the cameras are calibrated (i.e., we know K). It relates corresponding points in normalized camera coordinates and satisfies the epipolar constraint: $\mathbf{x}_2^TE\mathbf{x}_1 = 0 $
@@ -377,7 +377,7 @@ To compute E, we need to:
         - The essential matrix operates on normalized camera coordinates, not pixel coordinates.
         - Use K to convert pixel coordinates $\mathbf{x} = [x, y, 1]^T$ to normalized coordinates $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$.
         - Specifically, for a point $(x, y)$:  
-        ![matrix](https://latex.codecogs.com/png.latex?\hat{x}=\begin{bmatrix}\frac{x-cx}{fx}\\ \frac{y-cy}{fy}\\ 1\end{bmatrix}) 
+        ![matrix](https://latex.codecogs.com/png.latex?\hat{x}=\begin{bmatrix}\frac{x-cx}{fx}\\\frac{y-cy}{fy}\\1\end{bmatrix}) 
 
     3. **Compute the Essential Matrix**:
         - Use the normalized coordinates to compute E. The standard method is the `5-point algorithm`, which requires at least 5 pairs of corresponding points to estimate E (though more points improve robustness).
