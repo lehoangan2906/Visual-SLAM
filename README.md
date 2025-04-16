@@ -256,9 +256,12 @@ pts1:                pts2:                # pts1, pts2: lists containing corresp
 [ (x_1, y_1)_n ]     [ (x_2, y_2)_n ]
 --------------------------------------------------
           |
+          |
           | Use K to convert x = [x, y, 1]^T to x̂ = K^(-1) * x
           | # x = [x, y, 1]^T: Homogeneous pixel coordinates of a point
           | # x̂: Normalized camera coordinates (after applying K^(-1))
+          |
+          |
           v
 Matches (normalized camera coordinates)
 --------------------------------------------------
@@ -269,8 +272,12 @@ x̂_1:                 x̂_2:                 # x̂_1, x̂_2: Corresponding poin
 [ x̂_1_n ]            [ x̂_2_n ]
 --------------------------------------------------
           |
+          |
+          |
           | Compute based on x̂_2^T * E * x̂_1 = 0
           | # Uses the 5-point algorithm with RANSAC
+          |
+          |
           v
 Essential Matrix E
 --------------------------------------------------
