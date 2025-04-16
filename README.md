@@ -377,7 +377,7 @@ To compute E, we need to:
         - The essential matrix operates on normalized camera coordinates, not pixel coordinates.
         - Use K to convert pixel coordinates $\mathbf{x} = [x, y, 1]^T$ to normalized coordinates $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$.
         - Specifically, for a point $(x, y)$:  
-        ![matrix](https://latex.codecogs.com/png.latex?\hat{x}=\begin{bmatrix}\frac{x-cx}{fx}\\\frac{y-cy}{fy}\\1\end{bmatrix}) 
+       ![matrix](https://latex.codecogs.com/png.latex?\bg_white\hat{x}=\begin{bmatrix}\frac{x-cx}{fx}\\\frac{y-cy}{fy}\\1\end{bmatrix}) 
 
     3. **Compute the Essential Matrix**:
         - Use the normalized coordinates to compute E. The standard method is the `5-point algorithm`, which requires at least 5 pairs of corresponding points to estimate E (though more points improve robustness).
