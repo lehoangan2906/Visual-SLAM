@@ -246,6 +246,39 @@ To do this, we use the matching points from the previous step, and a special cam
     - `R`: The rotation matrix, showing how the camera turned.
     - `t`: The translation vector, showing how the camera moved.
 
+```text
+Matches (pixel coordinates)
+--------------------------------------------------
+pts1:                pts2:                # pts1, pts2: lists containing corresponding keypoints
+[ (x_1, y_1)_1 ]     [ (x_2, y_2)_1 ]     # in two consecutive frames (pixel coordinates)
+[ (x_1, y_1)_2 ]     [ (x_2, y_2)_2 ]     # e.g., (x_1, y_1)_1 corresponds to (x_2, y_2)_1
+[     ...      ]     [     ...      ]     # Extracted from good_matches using kp1[m.queryIdx].pt and kp2[m.trainIdx].pt
+[ (x_1, y_1)_n ]     [ (x_2, y_2)_n ]
+--------------------------------------------------
+          |
+          | Use K to convert x = [x, y, 1]^T to x̂ = K^(-1) * x
+          | # x = [x, y, 1]^T: Homogeneous pixel coordinates of a point
+          | # x̂: Normalized camera coordinates (after applying K^(-1))
+          v
+Matches (normalized camera coordinates)
+--------------------------------------------------
+x̂_1:                 x̂_2:                 # x̂_1, x̂_2: Corresponding points in normalized coordinates
+[ x̂_1_1 ]            [ x̂_2_1 ]            # x̂_1_i = K^(-1) * [x_1_i, y_1_i, 1]^T
+[ x̂_1_2 ]            [ x̂_2_2 ]            # x̂_2_i = K^(-1) * [x_2_i, y_2_i, 1]^T
+[  ...  ]            [  ...  ]
+[ x̂_1_n ]            [ x̂_2_n ]
+--------------------------------------------------
+          |
+          | Compute based on x̂_2^T * E * x̂_1 = 0
+          | # Uses the 5-point algorithm with RANSAC
+          v
+Essential Matrix E
+--------------------------------------------------
+# E: 3x3 matrix encoding relative rotation and translation
+# Satisfies the epipolar constraint: x̂_2^T * E * x̂_1 = 0
+--------------------------------------------------
+```
+
 **🧮 <ins>Two Important Kinds of Matrices</ins>**:
 - **Fundamental Matrix (F)**:
     - Use this when you **don't know the camera's internal details** (like lens size, sensor size, etc,.).
@@ -281,15 +314,6 @@ So, in summary:
 - **Un-Calibrated Camera**: We don’t know K.
     - **Pros**: Easier to start since we don’t need K.
     - **Cons**: We can’t get the exact movement, just a rough idea.
-
-**🧠 <ins>How We Derive the Essential Matrix</ins>**:
-
-Okay, so to compute an **essential matrix** ($E$), we need `matchings` ($\mathbf{x}$'s) (pairs of corresponding keypoints in two consecutive frames), then derive it based on solving the equation $\mathbf{x_2^T}E\mathbf{x_1} = 0$.
-
-But the original x's values are in the **pixel coordinates**, we need to convert them into **normalized camera coordinates**, so we need the camera's` intrinsic matrix` to do so.<p> 
-Therefore, to derive the **essential matrix** that encodes the camera's pose between two consecutive frames, we need matchings (at least 8) as well as the camera's intrinsic matrix as inputs.
-
--> After having the essential matrix, we can decompose it into the `rotatio`n and `translation matrices` using `cv2.recoverPose()`, which gives us the camera's motion between the two frames.
 
 **⚖️  <ins>Estimating the Camera's Intrinsic Matrix</ins>**:
 
@@ -333,4 +357,29 @@ So the final pipeline to compute the intrinsic matrix is as follows:
 9. Calculate the focal length (fx = fy) using the vanishing points and principal point with the orthogonality constraint.
 10. Construct K as [[fx, 0, cx], [0, fy, cy], [0, 0, 1]].
 
-
+**🧠 <ins>How We Derive the Essential Matrix</ins>**:
+- **What we have**:
+    1. **Matches**:
+        - `kp1`, `kp2`: Lists of keypoints from two consecutive frames (e.g., 6200–7000 keypoints per frame).
+        - `good_matches`: A list of matches (e.g., ~780 matches after RANSAC), where each match is a `cv2.DMatch` object linking a keypoint in `kp1` to a keypoint in `kp2`. Each match provides a pair of corresponding 2D points in pixel coordinates (e.g., (x1, y1) in frame 1 and (x2, y2) in frame 2).
+    2. **Intrinsic Matrix (K)**:
+        - A $3 \times 3$ matrix $K = \begin{bmatrix}fx & 0 & cx\\ 0 & fy & cy\\ 0 & 0 & 1 \end{bmatrix}$, where $fx, fy$ are the focal lengths in pixels, and $(cx, cy)$ is the principal point (image center). This matrix relates pixel coordinates to normalized camera coordinates.
+- **Goal: Compute the Essential Matrix (E)**:
+The essential matrix E is a 3x3 matrix that encodes the relative pose (rotation R and translation t) between two camera views, assuming the cameras are calibrated (i.e., we know K). It relates corresponding points in normalized camera coordinates and satisfies the epipolar constraint: $\mathbf{x}_2^TE\mathbf{x}_1 = 0 $
+where $\mathbf{x}_1$ and $\mathbf{x}_2$ are the `normalized coordinates` of corresponding points in the two frames.
+- **Approach to Compute the Essential Matrix**:
+To compute E, we need to:
+    1. **Extract Corresponding Points**:
+        - From `good_matches`, extract the 2D pixel coordinates of matches points: $(x_1, y_1)$ from `kp1[m.queryIdx].pt` and $(x_2, y_2)$ from `kp2[m.trainIdx].pt` for each match `m`.
+        - This gives us two arrays: pts1 (points in frame 1) and pts2 (points in frame 2), both in pixel coordinates.
+    2. **Convert Pixel Coordinates to Normalized Camera Coordinates**:
+        - The essential matrix operates on normalized camera coordinates, not pixel coordinates.
+        - Use K to convert pixel coordinates $\mathbf{x} = [x, y, 1]^T$ to normalized coordinates $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$.
+        - Specifically, for a point $(x, y)$: $\mathbf{\hat{x}} = \begin{bmatrix} \frac{(x - cx)}{fx}\\ \frac{(y - cy)}{fy}\\ 1 \end{bmatrix}$
+    3. **Compute the Essential Matrix**:
+        - Use the normalized coordinates to compute E. The standard method is the `5-point algorithm`, which requires at least 5 pairs of corresponding points to estimate E (though more points improve robustness).
+        - Since we have noise in the matches (e.g., outliers), we combine the 5-point algorithm with `RANSAC` to filter out incorrect matches and estimate a robust E.
+        - The 5-point algorithm minimizes the epipolar constraint while ensuring E has the correct structure (rank 2 with two equal non-zero singular values).
+    4. **Decompose E into Rotation and Translation**:
+        - Once we have E, we can decompose it into the relative rotation R (a 3x3 rotation matrix) and translation t (a 3x1 unit vector) between the two frames.
+        - The decomposition yields four possible solutions for (R, t), but we can disambiguate them by checking which solution places the 3D points in front of both cameras (positive depth).
