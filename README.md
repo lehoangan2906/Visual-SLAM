@@ -365,6 +365,7 @@ So the final pipeline to compute the intrinsic matrix is as follows:
     2. **Intrinsic Matrix (K)**:
         - A $3 \times 3$ matrix $K = \begin{bmatrix}fx & 0 & cx\\ 0 & fy & cy\\ 0 & 0 & 1 \end{bmatrix}$, where $fx, fy$ are the focal lengths in pixels, and $(cx, cy)$ is the principal point (image center). This matrix relates pixel coordinates to normalized camera coordinates.
 - **Goal: Compute the Essential Matrix (E)**:
+
 The essential matrix E is a 3x3 matrix that encodes the relative pose (rotation R and translation t) between two camera views, assuming the cameras are calibrated (i.e., we know K). It relates corresponding points in normalized camera coordinates and satisfies the epipolar constraint: $\mathbf{x}_2^TE\mathbf{x}_1 = 0 $
 where $\mathbf{x}_1$ and $\mathbf{x}_2$ are the `normalized coordinates` of corresponding points in the two frames.
 - **Approach to Compute the Essential Matrix**:
@@ -375,7 +376,10 @@ To compute E, we need to:
     2. **Convert Pixel Coordinates to Normalized Camera Coordinates**:
         - The essential matrix operates on normalized camera coordinates, not pixel coordinates.
         - Use K to convert pixel coordinates $\mathbf{x} = [x, y, 1]^T$ to normalized coordinates $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$.
-        - Specifically, for a point $(x, y)$: $\mathbf{\hat{x}} = \begin{bmatrix} \frac{(x - cx)}{fx}\\ \frac{(y - cy)}{fy}\\ 1 \end{bmatrix}$
+        - Specifically, for a point $(x, y)$: 
+
+        $\mathbf{\hat{x}} = \begin{bmatrix} \frac{(x - cx)}{fx}\\ \frac{(y - cy)}{fy}\\ 1 \end{bmatrix}$
+
     3. **Compute the Essential Matrix**:
         - Use the normalized coordinates to compute E. The standard method is the `5-point algorithm`, which requires at least 5 pairs of corresponding points to estimate E (though more points improve robustness).
         - Since we have noise in the matches (e.g., outliers), we combine the 5-point algorithm with `RANSAC` to filter out incorrect matches and estimate a robust E.
