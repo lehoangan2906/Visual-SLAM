@@ -1,0 +1,664 @@
+This is the current project hierarchy:
+
+.
+├── camera_properties
+│   └── extract.py
+├── display
+│   └── display.py
+├── extractor
+│   └── extractor.py
+├── images
+│   ├── AKAZE.png
+│   ├── Essential_Matrix.png
+│   ├── Final_Matching_result.png
+│   ├── goodFeaturesToTrack.png
+│   ├── low quality.png
+│   ├── ORB.png
+│   └── SIFT.png
+├── logs
+│   ├── Apr 3.md
+│   └── Mar 31.md
+├── main.py
+├── README.md
+└── videos
+    ├── test.mp4
+    └── test2.mp4
+
+---
+In which, the folders images, logs, and the file README.md contains notes and documentation about the project.
+The videos folder contains the source video we're working on.
+The camera_properties folder contains the extract.py file that is used to estimate the camera's intrinsic matrix K.
+The extractor folder contains the extractor.py file that is used to detect the keypoints and descriptors in each frame, then match them.
+The display folder contains the display.py file that is used to display out the video and the keypoints or matches (if needed).
+The main.py file is used to read the input video, call the helper codes in order to process the video and construct the map of the surrounding environment.
+
+---
+This is the current content of extractor.py:
+
+#!/usr/bin/python3
+
+import cv2
+import numpy as np
+
+# Function to preprocess frames to enhance Road features (lane markings, curbs, etc,.)
+def preprocess_image(img):
+   # convert the image to grayscale as the features are more prominent in grayscale image
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Apply CLAHE for contrast enhancement in low-texture road areas
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)    # Apply CLAHE to the grayscale image
+
+    # Apply Gaussian blur to reduce noise and smoothen the image
+    blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
+
+    # Apply Canny edge detection to highlight lane markings and curbs
+    edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+
+    # Convert edges back to 3-channel for compatibility with AKAZE/ORB
+    edges_3ch = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+
+    # Blend the original image with the edge image to retain some texture
+    blended = cv2.addWeighted(img, 0.5, edges_3ch, 0.5, 0.0)
+
+    return blended, enhanced    # Return both blended (for AKAZE/ORB) and enhanced (for goodFeaturesToTrack)
+
+
+
+# Extract feature using a combination of AKAZE and ORB
+def extract_akaze_orb_features(img1, img2):
+    # Preprocess the frames to enhance road features
+    img1_preprocessed, img1_enhanced = preprocess_image(img1)
+    img2_preprocessed, img2_enhanced = preprocess_image(img2)
+    
+
+    # Initialize AKAZE and ORB detectors instances
+    akaze = cv2.AKAZE_create(threshold=0.0001, diffusivity=cv2.KAZE_DIFF_PM_G2)
+    orb = cv2.ORB_create(nfeatures=1500)
+
+
+    # ==================== Masking ====================
+
+    # Create mask to mask off some repetitive regions (sky, grass, etc.) in some scenarios (if needed)
+    # height, width = img1.shape[:2]    # Get the image's dimentions
+    # mask = np.ones((height, width), dtype=np.uint8) * 255
+    # sky_height = int(height * 0.35)   # Declare the masked region as the top 35% of the image
+    # mask[:sky_height, :]  = 0         # Mask off the top 35% of the image
+    # mask[sky_height:, :]  = 0         # Mask off the bottom 65% of the image
+
+
+    # Set the mask value
+    mask = None
+
+    
+    # ==================== Feature Extraction ====================
+
+    # Separately detect keypoints and descriptors with AKAZE and ORB
+    kp1_akaze, des1_akaze = akaze.detectAndCompute(img1_preprocessed, mask)
+    kp2_akaze, des2_akaze = akaze.detectAndCompute(img2_preprocessed, mask)
+
+    kp1_orb, des1_orb = orb.detectAndCompute(img1_preprocessed, mask)
+    kp2_orb, des2_orb = orb.detectAndCompute(img2_preprocessed, mask)
+
+   
+    # Detect road-specific keypoints using GoodFeaturesToTrack
+    def detect_road_corners(img_enhanced):
+        # Detect corners using goodFeaturesToTrack on the enhanced grayscale image
+        corners = cv2.goodFeaturesToTrack(img_enhanced, maxCorners=500, qualityLevel=0.01, minDistance=10)
+        if corners is None:
+            return [], np.array([], dtype=np.uint8).reshape(0, 32)
+        # Convert corners to keypoints
+        keypoints = [cv2.KeyPoint(x=c[0][0], y=c[0][1], size=10) for c in corners]
+        # Compute ORB descriptors for these keypoints
+        _, descriptors = orb.compute(img1 if keypoints else None, keypoints)
+        return keypoints, descriptors 
+
+    
+    kp1_road, des1_road = detect_road_corners(img1_enhanced)
+    kp2_road, des2_road = detect_road_corners(img2_enhanced)
+
+    # Convert all keypoints to lists for consistent concatenation
+    kp1_akaze = list(kp1_akaze) if kp1_akaze is not None else []
+    kp2_akaze = list(kp2_akaze) if kp2_akaze is not None else []
+    kp1_orb = list(kp1_orb) if kp1_orb is not None else []
+    kp2_orb = list(kp2_orb) if kp2_orb is not None else []
+
+    # Combine the keypoints, the descriptors need to be matched separately first
+    kp1 = kp1_akaze + kp1_orb + kp1_road
+    kp2 = kp2_akaze + kp2_orb + kp2_road
+
+    # ==================== Corner cases handling ====================
+    
+    # Handle the empty descriptors case
+    if des1_akaze is None:
+        des1_akaze = np.array([], dtype=np.uint8).reshape(0, 61)    # if no keypoints detected, create an empty array
+    if des2_akaze is None:
+        des2_akaze = np.array([], dtype=np.uint8).reshape(0, 61)
+    if des1_orb is None:
+        des1_orb = np.array([], dtype=np.uint8).reshape(0, 32)
+    if des2_orb is None:
+        des2_orb = np.array([], dtype=np.uint8).reshape(0, 32)
+    if des1_road is None:
+        des1_road = np.array([], dtype=np.uint8).reshape(0, 32)
+    if des2_road is None:
+        des2_road = np.array([], dtype=np.uint8).reshape(0, 32)
+   
+    # Handle the case where there are no descriptors detected
+    if (des1_akaze.size == 0 and des1_orb.size == 0 and des1_road.size == 0) or (des2_akaze.size == 0 and des2_orb.size == 0 and des2_road.size == 0):
+        return kp1, kp2, []
+
+    # ===================== Feature Matching ====================
+
+    # Create a FLANN matcher for binary descriptors
+    FLANN_INDEX_LSH = 6 
+    index_params = dict(algorithm=FLANN_INDEX_LSH, table_number=6, key_size=12, multi_probe_level = 1)
+    search_params = dict(checks=50)
+    matcher = cv2.FlannBasedMatcher(index_params, search_params)
+
+
+    # Create a brute-force matcher
+    # matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)  # Cross-check only enabled when using 1-NN matcher, using Hamming distance as the distance measurement.
+
+    # Set the Lowe's ratio test threshold
+    lowe_thres = 0.65
+
+    # Compute the matches between the two frames' descriptors
+    # Match AKAZE descriptors separately
+    good_matches_akaze = []     # Placeholder for good matches
+    if des1_akaze.shape[0] >= 2 and des2_akaze.shape[0] >= 2:
+        matches_akaze = matcher.knnMatch(des1_akaze, des2_akaze, k=2)   # Use 2-NN matcher
+        good_matches_akaze = [m[0] for m in matches_akaze if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+
+
+    # Match ORB descriptors separately
+    good_matches_orb = []     # Placeholder for good matches
+    if des1_orb.shape[0] >= 2 and des2_orb.shape[0] >= 2:
+        matches_orb = matcher.knnMatch(des1_orb, des2_orb, k=2)   # Use 2-NN matcher
+        good_matches_orb = [m[0] for m in matches_orb if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+
+
+    # Match road-specific descriptors separately
+    good_matches_road = []
+    if des1_road.shape[0] >= 2 and des2_road.shape[0] >= 2:
+        matches_road = matcher.knnMatch(des1_road, des2_road, k=2)
+        good_matches_road = [m[0] for m in matches_road if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+
+
+    # Adjust ORB match indices to account for combined keypoint list
+    num_akaze_kp1 = len(kp1_akaze)
+    num_akaze_kp2 = len(kp2_akaze)
+    num_orb_kp1 = len(kp1_orb)
+    num_orb_kp2 = len(kp2_orb)
+
+    for match in good_matches_orb:
+        match.queryIdx += num_akaze_kp1     # Offset by number of AKAZE keypoints in img1
+        match.trainIdx += num_akaze_kp2     # Offset by number of AKAZE keypoints in img2
+    for match in good_matches_road:
+        match.queryIdx += (num_akaze_kp1 + num_orb_kp1)
+        match.trainIdx += (num_akaze_kp2 + num_orb_kp2)
+
+
+    # Combine the good matches from both AKAZE and ORB
+    good_matches = good_matches_akaze + good_matches_orb + good_matches_road
+    #print(f"Total good matches before RANSAC: {len(good_matches)}")
+
+
+    # ==================== RANSAC to filter outliers ====================
+    if len(good_matches) > 10:
+        pts1 = np.array([kp1[m.queryIdx].pt for m in good_matches], dtype=np.float32)
+        pts2 = np.array([kp2[m.trainIdx].pt for m in good_matches], dtype=np.float32)
+
+        if pts1.shape[0] > 0 and pts2.shape[0] > 0:
+            _, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC, ransacReprojThreshold=3.0, confidence=0.95)
+            if mask is not None:
+                good_matches = [m for i, m in enumerate(good_matches) if mask[i]]
+            #print(f"Good matches after RANSAC: {len(good_matches)}")
+
+
+    # ==================== Return the keypoints and good matches ====================
+    #print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    #print(f"Keypoints in img (kp2): {len(kp2)}")
+    #print(f"Good matches: {len(good_matches)}")
+
+
+    return kp1, kp2, good_matches
+
+---
+This is the current content of display.py:
+
+#!usr/bin/python3
+
+import cv2
+import numpy as np 
+from extractor.extractor import extract_akaze_orb_features
+
+# Global variable to store the previous frame and its state
+prev_img = None
+
+
+# Reads a video, processes each frame, and displays the results.
+def play_video(video_path):
+    """
+    Play the video from the given path, processing each frame to extract and display features.
+
+    Args:
+        video_path (str): The path to the video file.
+    """
+
+    # Create a VideoCapture object
+    cap = cv2.VideoCapture(video_path)
+
+
+    # Check if the video is opened successfully
+    if not cap.isOpened():
+        print("Could not open the video file: ", video_path)
+        return
+
+
+    # Read and process frames until the video ends
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break       # End of video
+
+        # Increment frame counter (for debugging or frame skipping if needed)
+        frame_count += 1
+
+        # Downscale the frame to reduce computational load
+        frame = cv2.resize(frame, (frame.shape[1]//4, frame.shape[0]//4))
+
+        # Ensure the frame is in color (BGR) for visualization
+        if len(frame.shape) == 2:   # If grayscale, convert to BGR
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
+        # Process the frame (extract features and display)
+        process_frame(frame)
+
+        # Display the frame number for debugging (if needed)
+        # print("Frame: ", frame_count)
+
+        # Press 'q' to quit the video 
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            break
+
+    # Release the video capture object and close all windows
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+# Extracts features, matches keypoints with the previous frame, and visualizes matches.
+def process_frame(img):
+    """
+    Process a single frame to extract features, match with the previous frame, and 
+    display the results.
+
+    Args:
+        img (numpy.ndarray): The input frame to process.
+    """
+
+    global prev_img, prev_kp, prev_good_matches
+
+
+    # Initialize on the first frame
+    if prev_img is None:
+        prev_img = img   # Store the current frame for the next iteration
+        
+        # Since this is the first frame, we cannot call extract_akaze_orb_features funciton to  match an image with itself.
+        # Initialize prev_kp without matching (avoid dummy call to extract_akaze_orb_features)
+        akaze = cv2.AKAZE_create(threshold=0.008, diffusivity=cv2.KAZE_DIFF_PM_G2)
+        orb = cv2.ORB_create(nfeatures=1500)
+        
+        # Preprocess the image (same as in extract_akaze_orb_features)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
+        edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+        edges_3ch = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        img_preprocessed = cv2.addWeighted(img, 0.5, edges_3ch, 0.5, 0.0)
+
+        # Detect keypoints with AKAZE and ORB
+        kp_akaze, _ = akaze.detectAndCompute(img_preprocessed, None)
+        kp_orb, _ = orb.detectAndCompute(img_preprocessed, None)
+        prev_kp = kp_akaze + kp_orb if kp_akaze and kp_orb else (kp_akaze or kp_orb) or []
+        cv2.imshow("SLAM Output", prev_img)
+        cv2.waitKey(1)
+        return
+
+    # Extract keypoints and matches between the previous and current frame
+    kp1, kp2, good_matches = extract_akaze_orb_features(prev_img, img)
+
+
+    # Debugging: Print keypoint and match counts
+    # print(f"Keypoints in prev_img (kp1): {len(kp1)}")
+    # print(f"Keypoints in img (kp2): {len(kp2)}")
+    # print(f"Good matches: {len(good_matches)}")
+
+    # Visualize the results
+    if good_matches and len(kp1) > 0 and len(kp2) > 0:
+        # Create an output image for drawing matches
+        height = max(prev_img.shape[0], img.shape[0])
+        width = prev_img.shape[1] + img.shape[1]
+        output_img = np.zeros((height, width, 3), dtype=np.uint8)
+
+
+        # Draw the matches between the two frames on the output image
+        img_matches = cv2.drawMatches(
+            prev_img, kp1, img, kp2, good_matches, output_img,
+            matchColor = (0, 255, 0),   # Green lines for matches
+            singlePointColor = (0, 0, 255), # Red dots for keypoints
+            flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+                )
+        # img_matches = cv2.drawMatches(prev_img, kp1, img, kp2, good_matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+        cv2.imshow("SLAM Output", img_matches)
+
+    else:
+        # Fallback: display the current frame with keypoints if there are no matches
+        img_with_kp = img.copy()
+        if len(kp2) > 0:
+            img_with_kp = cv2.drawKeypoints(
+                    img, kp2, img_with_kp,
+                    flags = cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+                )
+
+            cv2.imshow("SLAM Output", img_with_kp)
+
+    # Update the previous frame for the next iteration
+    prev_img = img.copy()   # Ensure a fresh copy for the next iteration
+    prev_kp = kp2
+    prev_good_matches = good_matches
+
+if __name__ == "__main__":
+    video_path = "videos/test.mp4"
+    play_video(video_path)
+
+---
+This is the current content of the extract.py:
+
+#!/usr/bin/python3
+
+import cv2
+import random
+import numpy as np
+
+
+def line_intersection(line1, line2):
+    """
+    Function to find the intersection point of two lines.
+    Used to find the vanishing points.
+    """
+    x1, y1, x2, y2 = line1[0]
+    x3, y3, x4, y4 = line2[0]
+    
+    # Calculate the intersection point using the determinant method
+    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+
+    # Check if the lines are parallel
+    if abs(denom) < 1e-6:
+        return None
+
+    # Calculate the intersection point
+    px = ((x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4)) / denom
+    py = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)) / denom
+
+    return (px, py)
+
+
+
+def get_slope(line):
+    """
+    Function to calculate the slope of a line.
+    """
+    x1, y1, x2, y2 = line[0]
+    if x2 - x1 == 0:
+        return float('inf')
+
+    return (y2 - y1) / (x2 - x1)
+
+
+def find_vanishing_points(lines_group, width, height):
+    """
+    Function to find the vanishing points from a list of lines.
+
+    Args:
+        lines_group (list): List of lines (each line is represented as a tuple of coordinates).
+
+    Returns:
+        np.ndarray: The vanishing point (x, y) if found, otherwise None.
+    """
+    intersections = []
+
+    # Find the intersection points of all pairs of lines in the group (near horizontal or near vertical)
+    for i in range(len(lines_group)):
+        for j in range(i + 1, len(lines_group)):
+            intersection = line_intersection(lines_group[i], lines_group[j])
+
+            # Check if the intersection point is valid (i.e., within the frame)
+            if intersection and 0 <= intersection[0] < width and 0 <= intersection[1] < height:
+                intersections.append(intersection)
+
+    if not intersections:
+        return None
+
+    # Return the final point which is the median of all the intersection points in the group
+    return np.mean(intersections, axis = 0)
+
+
+def estimate_intrinsic_matrix(video_path, num_frames=20, verbose=True):
+    """
+    Estimate the camera's intrinsic matrixs (K) using the vanishing point method.
+
+    Args:
+        video_path (str): Path to the source video file.
+        num_frames (int): Number of frames to sample for averaging.
+        verbose (bool): If True, print additional information like errors.
+
+    Returns;
+        np.ndarrays: 3x3 intrinsic matrix K
+    """
+
+
+    # =============== Read the video file and extract frames ===============
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Could not open video file: {video_path}")
+        return None
+
+
+    # Get the total number of frames
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames < num_frames:
+        print(f"Video has fewer than {num_frames} frames")
+        return None
+
+    
+    # Sample random indices from the video
+    frame_indices = random.sample(range(total_frames), num_frames)
+    frames = []
+    height, width = None, None
+
+    
+    # Sample random frames from the video
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
+        # Downscale frame to match display.py (1/4 of the original size)
+        frame = cv2.resize(frame, (frame.shape[1]//4, frame.shape[0]//4))
+        frames.append(frame)    # Append the frame to the list
+
+        # Get the height and width of the first frame
+        if height is None:
+            height, width = frame.shape[:2]
+
+    cap.release()    # Release the video capture object
+    if not frames:
+        if verbose:
+            print("No frames were read from the video.")
+        return None
+
+
+    # =============== Detect the vanishing points ===============
+    vanishing_points_pairs = [] # Contains pairs of vanishing points in all sampled frames
+
+    for frame in frames:
+        # Convert to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Detect edges using Canny
+        edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+
+        # Detect lines using Hough Transform
+        lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180, threshold=50, minLineLength=50,maxLineGap=10)        # Numpy array containing multiple lines detected in the frame
+
+        # Skip this frame if less than 2 lines are detected
+        if lines is None or len(lines) < 2:
+            continue
+
+        # =============== Cluster lines into two groups based on slope (e.g., road direction and perpendicular)
+        slopes = [get_slope(line) for line in lines]
+        slopes = np.array(slopes)                   # Convert into numpy array
+        finite_slopes = slopes[np.isfinite(slopes)]  # Filter out infinite slopes
+
+        # Skip this frame if less than 2 finite slopes are detected
+        if len(finite_slopes) < 2:
+            continue
+
+
+        # Cluster into two groups (e.g., road direction and perpendicular)
+        # Use a simple threshold to separate near-vertical and near-horizontal lines
+        slope_threshold = np.tan(np.pi/4)   # 45 degrees
+        group1 = [lines[i] for i in range(len(lines)) if abs(slopes[i]) > slope_threshold]  # Near-vertical
+        group2 = [lines[i] for i in range(len(lines)) if abs(slopes[i]) <= slope_threshold] # Near-horizontal
+
+
+
+        # Check to ensure that we can compute at least 2 vanishing points for each frame
+        if len(group1) < 2 or len(group2) < 2:
+            continue
+
+
+        # =============== Find the intersection points (vanishing points) from lines ===============
+
+        vp1 = find_vanishing_points(group1, width, height)
+        vp2 = find_vanishing_points(group2, width, height)
+
+
+        # Skip if no vanishing points are found
+        if vp1 is None or vp2 is None:
+            continue
+
+
+        vanishing_points_pairs.append((vp1, vp2))
+
+    if not vanishing_points_pairs:
+        if verbose:
+            print("Could not detect two vanishing points in any frame.")
+        return None
+
+
+    # ============== Estimate the intrinsic matrix ==============
+
+    # Average the vanishing points across frames
+    vp1s, vp2s = zip(*vanishing_points_pairs)   
+    vp1 = np.mean(vp1s, axis=0)
+    vp2 = np.mean(vp2s, axis=0)
+
+
+    # Assume that the principal point is at the center of the image
+    cx = width / 2
+    cy = height / 2
+
+    # Calculate the focal length of the camera
+    f_squared = -((vp1[0] - cx) * (vp2[0] - cx) + (vp1[1] - cy) * (vp2[1] - cy))
+
+    if f_squared <= 0:
+        if verbose:
+            print("Invalid focal length calculation.")
+        return None
+
+    f = np.sqrt(f_squared)
+
+    fx = f
+    fy = f
+
+    # Construct the intrinsic matrix K
+    K = np.array([[fx, 0, cx],
+                 [0, fy, cy],
+                 [0, 0, 1]], dtype=np.float32)
+
+    return K
+
+if __name__ == "__main__":
+    video_path = "../videos/test2.mp4"
+    K = estimate_intrinsic_matrix(video_path)
+
+    print(f"Estimated Intrinsic Matrix (K): {K}")
+
+---
+This is the current content of the main.py:
+
+#!/usr/bin/python3
+
+import numpy as np
+from display.display import play_video
+from camera_properties.extract import estimate_intrinsic_matrix
+
+def estimating_intrinsic_matrix(video_path):
+    """
+    Estimate the camera's intrinsic matrix using the vanishing point method.
+    Stablilize the resulting K matrix by averaging over multiple runs to reduce outliers.
+    """
+    
+    print("----------------------------------------------------------\n\n        Estimating the Camera's Intrinsic Matrix K\n\n                This may take a moment\n\n----------------------------------------------------------")
+
+    # Compute the intrinsic matrix K of the camera by averaging multiple runs
+    num_runs = 8 # Number of runs to average
+    
+    fx_list, fy_list, cx_list, cy_list = [], [], [], []     # Lists to store vanishing points and focal lengths
+
+    for _ in range(num_runs):
+        K = estimate_intrinsic_matrix(video_path, num_frames = 20, verbose = False)
+        
+        if K is not None:
+            fx_list.append(K[0, 0])
+            fy_list.append(K[1, 1])
+            cx_list.append(K[0, 2])
+            cy_list.append(K[1, 2])
+        else:
+            num_runs+=1
+
+    # Take the median to reduce the impact of outliers
+    fx = np.median(fx_list)
+    fy = np.median(fy_list)
+    cx = np.median(cx_list)
+    cy = np.median(cy_list)
+
+    # Reconstruct the intrinsic matrix K
+    K = np.array([[fx, 0, cx],
+                     [0, fy, cy],
+                     [0, 0, 1]], dtype=np.float32)
+
+    print(f"Estimated Intrinsic Matrix K:\n{K}")
+
+if __name__ == "__main__":
+    video_path = "videos/test2.mp4"
+    
+    # Estimate the camera's intrinsic matrix first
+    estimating_intrinsic_matrix(video_path)
+
+
+    # Use the play_video function from display.py 
+    play_video(video_path)
+
+---
+Now, we are having the code to compute the camera's intrinsic matrix, as well as computed matches across the frames. 
+
+The next step is to compute the essential matrix based on these two informations.
