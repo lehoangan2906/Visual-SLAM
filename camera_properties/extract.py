@@ -67,13 +67,14 @@ def find_vanishing_points(lines_group, width, height):
     return np.mean(intersections, axis = 0)
 
 
-def estimate_intrinsic_matrix(video_path, num_frames=10):
+def estimate_intrinsic_matrix(video_path, num_frames=20, verbose=True):
     """
     Estimate the camera's intrinsic matrixs (K) using the vanishing point method.
 
     Args:
         video_path (str): Path to the source video file.
         num_frames (int): Number of frames to sample for averaging.
+        verbose (bool): If True, print additional information like errors.
 
     Returns;
         np.ndarrays: 3x3 intrinsic matrix K
@@ -83,13 +84,15 @@ def estimate_intrinsic_matrix(video_path, num_frames=10):
     # =============== Read the video file and extract frames ===============
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        raise ValueError(f"Could not open video file: {video_path}")   
+        print(f"Could not open video file: {video_path}")
+        return None
 
 
     # Get the total number of frames
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if total_frames < num_frames:
-        raise ValueError(f"Video has fewer than {num_frames} frames")
+        print(f"Video has fewer than {num_frames} frames")
+        return None
 
     
     # Sample random indices from the video
@@ -115,7 +118,9 @@ def estimate_intrinsic_matrix(video_path, num_frames=10):
 
     cap.release()    # Release the video capture object
     if not frames:
-        raise ValueError("No frames were read from the video.")
+        if verbose:
+            print("No frames were read from the video.")
+        return None
 
 
     # =============== Detect the vanishing points ===============
@@ -175,7 +180,9 @@ def estimate_intrinsic_matrix(video_path, num_frames=10):
         vanishing_points_pairs.append((vp1, vp2))
 
     if not vanishing_points_pairs:
-        raise ValueError("Could not detect two vanishing points in any frame.")
+        if verbose:
+            print("Could not detect two vanishing points in any frame.")
+        return None
 
 
     # ============== Estimate the intrinsic matrix ==============
@@ -194,7 +201,9 @@ def estimate_intrinsic_matrix(video_path, num_frames=10):
     f_squared = -((vp1[0] - cx) * (vp2[0] - cx) + (vp1[1] - cy) * (vp2[1] - cy))
 
     if f_squared <= 0:
-        raise ValueError("Invalid focal length calculation.")
+        if verbose:
+            print("Invalid focal length calculation.")
+        return None
 
     f = np.sqrt(f_squared)
 
