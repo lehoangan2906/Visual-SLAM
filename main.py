@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import numpy as np
-from display.display import play_video
+from processing.processing import play_video
 from camera_properties.extract import estimate_intrinsic_matrix
 
 def estimating_intrinsic_matrix(video_path):
@@ -39,15 +39,17 @@ def estimating_intrinsic_matrix(video_path):
                      [0, fy, cy],
                      [0, 0, 1]], dtype=np.float32)
 
-    print(f"Estimated Intrinsic Matrix K:\n{K}")
+    print(f"Intrinsic matrix K:\n{K}\n")
+
+    return K
 
 if __name__ == "__main__":
     video_path = "videos/test2.mp4"
     
     # Estimate the camera's intrinsic matrix first
-    estimating_intrinsic_matrix(video_path)
+    K = estimating_intrinsic_matrix(video_path)
 
 
     # Use the play_video function from display.py 
-    play_video(video_path)
+    play_video(video_path, K)
 
