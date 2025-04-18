@@ -398,7 +398,7 @@ To compute E, we need to:
     **Definition**: Pixel coordinates refer to the 2D locations of points in an image as measured in the image plane, typically `in the units of pixels`. They are the raw coordinates output by image processing algorithms.
     `Pixel coordinates are affected by the camera's intrinsic paramters` (focal length and principal point).
     <p>
-    [!pixel_coordinates](images/pixel_coordinates.png)
+    ![pixel_coordinates](images/pixel_coordinates.png)
     <p>
     **Key Characteristics**: 
     - ** Representation**: A point in pixel coordinates is denoted as $(x, y)$, where:
@@ -421,7 +421,7 @@ To compute E, we need to:
     - **Units**: Unitless, as they are normalized by the camera's intrinsic parameters.
     - **Relation to Pixel Coordinates**: Normalized camera coordinates are computed from pixel coordinates using the inverse of the intrinsic matrix K: $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$
     <p>
-    [!conversion](images/Conversion.png)
+    ![conversion](images/Conversion.png)
 
     <p>
     - **Purpose**: Normalized coordinates are used in algorithms like essential matrix com[putation because they represent points as they would appear in an idealized pinhole camera (no lens distortion or intrinsic scaling).
