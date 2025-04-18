@@ -393,3 +393,35 @@ To compute E, we need to:
     4. **Decompose E into Rotation and Translation**:
         - Once we have E, we can decompose it into the relative rotation R (a 3x3 rotation matrix) and translation t (a 3x1 unit vector) between the two frames.
         - The decomposition yields four possible solutions for (R, t), but we can disambiguate them by checking which solution places the 3D points in front of both cameras (positive depth).
+- **Pixel coordinates vs Camera coordinates**:
+    1. **Pixel Coordinates**:
+    **Definition**: Pixel coordinates refer to the 2D locations of points in an image as measured in the image plane, typically `in the units of pixels`. They are the raw coordinates output by image processing algorithms.
+    `Pixel coordinates are affected by the camera's intrinsic paramters` (focal length and principal point).
+    <p>
+    [!pixel_coordinates](images/pixel_coordinates.png)
+    <p>
+    **Key Characteristics**: 
+    - ** Representation**: A point in pixel coordinates is denoted as $(x, y)$, where:
+        - $x$: Horizontal position in pixels (from left to right).
+        - $y$: Vertical position in pixels (from top to bottom).
+        - Often extended to homogeneous coordinates for matrix operations: $\mathbf{x} = [x, y, 1]^T$
+    - **Origin**: The origin $(0, 0)$ is typically at the **top-left corner** of the image.
+    - **Units**: Pixels, which depend on the image resolution.
+    - **Example**: A Keypoint at $(x_1, y_1)$ = (250.0, 300.2)$ in the first frame means it's 250.5 pixels right and 300.2 pixels down from the top-left corner of the image.
+
+    2. **Camera Coordinates (Normalized Camera Coordinates)**:
+    **Definition**: Camera coo0rdinates repressent 2D points in the camera's normalzed image plane. These coordinates are obtained by removing the effects of the camera's intrinsic parameters (via $K^{-1}$) from the pixel coordinates, effectively placing points in a coordinate system where the camera's focal length is 1 and the principal point is at $(0, 0)$.
+
+    **Key Characteristics**:
+    - **Representation**: A point in normalized camera cootrdinates is denoted as $\hat{\mathbf{x}} = [u, v, 1]^T$, where:
+        - $u$: Horizontal position in normalized units.
+        - $v$: Vertical position in normalized units.
+        - The third component is 1 in homogeneous coordinates.
+    - **Origin**: The origin $(0, 0)$ is at the **center of the image**, not the top-left corner.
+    - **Units**: Unitless, as they are normalized by the camera's intrinsic parameters.
+    - **Relation to Pixel Coordinates**: Normalized camera coordinates are computed from pixel coordinates using the inverse of the intrinsic matrix K: $\mathbf{\hat{x}} = K^{-1}\mathbf{x}$
+    <p>
+    [!conversion](images/Conversion.png)
+
+    <p>
+    - **Purpose**: Normalized coordinates are used in algorithms like essential matrix com[putation because they represent points as they would appear in an idealized pinhole camera (no lens distortion or intrinsic scaling).
