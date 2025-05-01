@@ -2,6 +2,8 @@
 
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from extractor.extractor import extract_akaze_orb_features
 
 # Global variables to store the previous frame and its state
@@ -235,6 +237,55 @@ def triangulate_points(pts1_norm, pts2_norm, R, t):
     return points_3d, valid_mask
 
 
+def visualize_map():
+    """
+    Visualize the 3D map and camera trajectory using the stored 3D points and camera poses.
+    """
+
+    # Extract 3D points from map_points
+    points_3d = np.array([entry['point_3d'] for entry in map_points])
+
+
+    # Compute global camera poses by accumulating relative poses
+    global_poses = [(np.eye(3), np.zeros((3, 1)))]  # Start with identity for the first frame
+    for R, t in camera_poses[1:]:
+        prev_R, prev_t = global_poses[-1]
+        new_R = prev_R @ R
+        new_t = prev_t + prev_R @ t
+        global_poses.append((new_R, new_t))
+
+
+    # Extract camera positions
+    camera_positions = np.array([pose[1].flatten() for pose in global_poses])
+
+
+    # Create 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot 3D points
+    if len(points_3d) > 0:
+        ax.scatter(points_3d[:, 0], points_3d[:, 1], points_3d[:, 2], c = 'b', s=1, label = '3D Points')
+
+    else:
+        print("No 3D points to visualize.")
+
+    # Plot camera trajectory
+    if len(camera_positions) > 0:
+        ax.plot(camera_positions[:, 0], camera_positions[:, 1], camera_positions[:, 2], 'r-', label='Camera_Trajectory')
+        ax.scatter(camera_positions[:, 0], camera_positions[:, 1], camera_positions[:, 2], c='r', s=50, label='Camera Positions')
+    else:
+        print("No camera poses to visualize.")
+
+    # Set labels and legent
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()
+    plt.title('3D Map and Camera Trajectory')
+    plt.show()
+
+
 # Reads a video, processes each frame, and displays the results.
 def play_video(video_path, K):
     """
@@ -281,6 +332,10 @@ def play_video(video_path, K):
     # Release the video capture object and close all windows
     cap.release()
     cv2.destroyAllWindows()
+
+
+    # Visualize the 3D map and camera trajectory
+    visualize_map()
 
 
 # Extracts features, matches keypoints with the previous frame, estimates pose, and visualizes matches.
