@@ -9,6 +9,8 @@ prev_img = None
 prev_kp = None
 prev_good_matches = None
 camera_poses = []  # List to store camera poses (R, t) for each frame
+map_points = []    # List to store 3D points and their associations
+
 
 def normalize_coordinates(pts, K):
     """
@@ -38,6 +40,7 @@ def normalize_coordinates(pts, K):
     pts_norm = pts_norm_h[:, :2] / pts_norm_h[:, 2:3]  # Divide by last coordinate, shape: (N, 2)
 
     return pts_norm
+
 
 def compute_essential_matrix(pts1, pts2):
     """
@@ -74,6 +77,7 @@ def compute_essential_matrix(pts1, pts2):
     E /= np.linalg.norm(E)
 
     return E
+
 
 def decompose_essential_matrix(E, pts1, pts2, K):
     """
@@ -161,6 +165,76 @@ def decompose_essential_matrix(E, pts1, pts2, K):
 
     return best_R, best_t
 
+
+def triangulate_points(pts1_norm, pts2_norm, R, t):
+    """
+    Triangulate 3D points from matched points in two frames.
+
+    Included steps:
+        - Set up the camera projection matrices
+        - Formulate the triangulation equation for each 3D point
+        - Solve for each 3D point X^i using SVD
+        - Filter out invalid 3D points
+
+    Args: 
+        - pts1_norm: normalized coordinates [u, v] for frame t.
+        - pts2_norm: normalized coordinates [u, v] for frame t+1.
+        - R: 3x3 rotation matrix (from frame t to frame t+1).
+        - t: 3x1 translation vector (from frame t to frame t+1).
+
+    Returns:
+        - points_3d: Array of shape (N, 3) containing 3D points [X, y, Z].
+        - valid_mask: Boolean array indicating valid points (positive depth).
+    """
+
+    
+    points_3d = []
+    valid_mask = []
+
+    
+    # Projection matrices
+    P1 = np.hstack([np.eye(3), np.zeros((3,1))])    # [I|0] for the first frame
+    P2 = np.hstack([R, t])                          # [R|t] for the second frame
+
+
+    # Triangulate each pair of points
+    for p1, p2 in zip(pts1_norm, pts2_norm):
+        p1_h = np.array([p1[0], p1[1], 1])  # Homogeneous: [u1, v1, 1]
+        p2_h = np.array([p2[0], p2[1], 1])  # Homogeneous: [u2, v2, 1]
+
+        # Construct the system of equation A*X = 0
+        A = np.zeros((4, 4))
+        A[0] = p1_h[1] * P1[2] - P1[1]  # v1 * P1_3 - P1_2
+        A[1] = P1[0] - p1_h[0] * P1[2]  # P1_1 - u1 * P1_3
+        A[2] = p2_h[1] * P2[2] - P2[1]  # v2 * P2_3 - P2_2
+        A[3] = P2[0] - p2_h[0] * P2[2]  # P2_1 - u2 * P2_3
+    
+        # Solve using SVD
+        _, _, V = np.linalg.svd(A)
+        X = V[-1]   # The solution X is the right singular vector corresponding to the smallest singular value (last column of V)
+        X /= X[3]   # Normalize homogeneous coordinate to make the last coordinate W to be 1  (X = [X, Y, Z, W] -> X = [X, Y, Z, 1])
+        X_3d = X[:3] # X = [X, Y, Z]
+
+
+        # Check the depth in both views:
+        z1 = X_3d[2]    # Depth in the first camera (Z coordinate value)
+        X2_h = P2 @ X   # Project to the second camera
+        z2 = X2_h[2]    # Depth in the second camera (Z coordinate value)
+
+
+        # Return valid if depth is positive in both views
+        is_valid = (z1 > 0) and (z2 > 0)
+        points_3d.append(X_3d if is_valid else np.zeros(3))
+        valid_mask.append(is_valid)
+
+
+    points_3d = np.array(points_3d)
+    valid_mask = np.array(valid_mask, dtype=bool)
+
+
+    return points_3d, valid_mask
+
+
 # Reads a video, processes each frame, and displays the results.
 def play_video(video_path, K):
     """
@@ -208,6 +282,7 @@ def play_video(video_path, K):
     cap.release()
     cv2.destroyAllWindows()
 
+
 # Extracts features, matches keypoints with the previous frame, estimates pose, and visualizes matches.
 def process_frame(img, K):
     """
@@ -218,7 +293,8 @@ def process_frame(img, K):
         img (numpy.ndarray): The input frame to process.
         K (np.ndarray): 3x3 camera intrinsic matrix.
     """
-    global prev_img, prev_kp, prev_good_matches, camera_poses
+    global prev_img, prev_kp, prev_good_matches, camera_poses, map_points
+
 
     # Initialize on the first frame
     if prev_img is None:
@@ -273,12 +349,37 @@ def process_frame(img, K):
             camera_poses.append((R, t))
             print(f"Frame {len(camera_poses)} - Rotation Matrix:\n{R}")
             print(f"Frame {len(camera_poses)} - Translation Vector:\n{t}")
+
+
+            # Triangulate 3D points
+            points_3d, valid_mask = triangulate_points(pts1_norm, pts2_norm, R, t)
+
+
+            # Store valid 3D points with their associations
+            current_frame_idx = len(camera_poses) - 1   # Frame t
+            prev_frame_idx = current_frame_idx - 1      # Frame t-1
+
+            for i, is_valid in enumerate(valid_mask):
+                if is_valid:
+                    point_3d = points_3d[i]
+
+                    # Store associations: (3D point, [frame_idx1, frame_idx2], [keypoint_idx1, keypoint_idx2])
+                    associations = {
+                        "point_3d": point_3d,
+                        "frame_indices": [prev_frame_idx, current_frame_idx],
+                        "keypoint_indices": [good_matches[i].queryIdx, good_matches[i].trainIdx]
+                            }
+
+                    map_points.append(associations)
+
+                print(f"Triangulated {np.sum(valid_mask)} valid 3D points out of {len(good_matches)} matches.")
         else:
             # Fallback: assume no motion
             R = np.eye(3, dtype=np.float32)
             t = np.zeros((3, 1), dtype=np.float32)
             camera_poses.append((R, t))
             print("Using identity pose as fallback.")
+            
     else:
         # Not enough matches
         R = np.eye(3, dtype=np.float32)
@@ -315,6 +416,7 @@ def process_frame(img, K):
     prev_img = img.copy()
     prev_kp = kp2
     prev_good_matches = good_matches
+
 
 if __name__ == "__main__":
     video_path = "videos/test.mp4"
