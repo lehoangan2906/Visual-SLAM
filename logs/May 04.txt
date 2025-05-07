@@ -1,0 +1,72 @@
+### Project Log: Approaches and Results
+
+#### 1. **Initial Setup and Intrinsic Matrix Estimation (May 04, 2025)**
+- **Approach**:
+  - Used `estimate_intrinsic_matrix` in `camera_properties/extract.py` to estimate the camera’s intrinsic matrix \( K \) using the vanishing point method from a video (`test2.mp4`).
+  - Integrated this into `main.py` to compute \( K \) and pass it to `play_video` in `processing.py`.
+  - `processing.py` implemented feature matching (`extract_akaze_orb_features`), pose estimation (\( R \), \( t \)), and triangulation to build a 3D map stored in `map_points`.
+- **Result**:
+  - Estimated \( K \) had unrealistic focal lengths (\( f_x = f_y = 8.22 \)), leading to distorted normalized coordinates and incorrect 3D points.
+  - Initial 3D map (visualized later) showed clustered points and a tiny camera trajectory, indicating a scale and calibration issue.
+
+#### 2. **Debugging Triangulation Error (May 04, 2025)**
+- **Approach**:
+  - Fixed an `IndexError` in `triangulate_points` where `z2 = X2_h[2] / X2_h[3]` assumed a 4D vector but got a 3D vector from \( P2 @ X \).
+  - Corrected the depth calculation to use `z2 = X2_h[2]` directly.
+- **Result**:
+  - Error resolved, allowing triangulation to proceed.
+  - However, the map quality remained poor due to the incorrect \( K \), with 3D points showing large outliers and an inconsistent scale.
+
+#### 3. **Visualization of the 3D Map (May 04, 2025)**
+- **Approach**:
+  - Added `visualize_map` to `processing.py` to plot 3D points from `map_points` and the camera trajectory from `camera_poses`.
+  - Called `visualize_map` at the end of `play_video`.
+- **Result**:
+  - First visualization showed a terrible map: 3D points (blue dots) were sparse, clustered near the origin with outliers up to 20,000 units, and the camera trajectory (red line) was extremely short despite the large point coordinates.
+  - The scale discrepancy and noisy points were attributed to the bad \( K \) and lack of reprojection filtering.
+
+#### 4. **Switch to Fixed Intrinsic Matrix (May 04, 2025)**
+- **Approach**:
+  - Replaced the estimated \( K \) with a fixed, realistic dummy \( K \) (\( f_x = f_y = 500 \), \( c_x = 320 \), \( c_y = 240 \)) in `main.py` to address the calibration issue.
+  - Kept the existing triangulation and visualization pipeline.
+- **Result**:
+  - Map still looks terrible: 3D points remain clustered or scattered with outliers, and the camera trajectory is either too short or misaligned.
+  - The fixed \( K \) improved normalization, but other issues (e.g., noisy matches, lack of scale consistency, no optimization) persist, indicating the problem lies beyond just \( K \).
+
+---
+
+### Current State and Observations
+- **Approaches Used**:
+  - Feature extraction and matching with AKAZE, ORB, and road-specific keypoints.
+  - Essential matrix estimation with the 8-point algorithm and decomposition for \( R \) and \( t \).
+  - Triangulation using projection matrices and SVD, with depth-based filtering.
+  - Visualization of 3D points and camera trajectory.
+  - Transition from estimated to fixed \( K \).
+
+- **Current Result**:
+  - The map remains poor despite the fixed \( K \). The 3D points are not forming a coherent highway structure (e.g., lanes or road edges), and the camera trajectory doesn’t reflect a realistic motion (e.g., forward movement along a highway).
+  - Likely causes include:
+    - **Noisy Feature Matches**: Outliers from `extract_akaze_orb_features` are triangulated into the map.
+    - **Lack of Reprojection Error Filtering**: No check for triangulation accuracy.
+    - **Scale Ambiguity**: Monocular SLAM’s inherent scale issue isn’t resolved, making the trajectory appear tiny.
+    - **No Bundle Adjustment**: Drift accumulates, distorting the map over time.
+
+---
+
+### Next Steps to Improve the Map
+Based on the log and current results, here are prioritized steps:
+1. **Add Reprojection Error Filtering**:
+   - Modify `triangulate_points` to filter points with high reprojection error (e.g., > 1.0 in normalized coordinates) to remove outliers.
+   - Expected Result: Reduced scatter of 3D points, making the map more structured.
+
+2. **Scale the Camera Trajectory**:
+   - Adjust `visualize_map` to scale the camera positions based on the 3D points’ median distance, improving visualization alignment.
+   - Expected Result: Camera trajectory will better match the 3D point cloud’s scale.
+
+3. **Debug Feature Matching**:
+   - Check `extract_akaze_orb_features` in `extractor.py` for noisy matches (e.g., adjust Lowe’s ratio test threshold or RANSAC parameters).
+   - Expected Result: Cleaner input matches, leading to better triangulation.
+
+4. **Implement Bundle Adjustment**:
+   - Add a basic bundle adjustment using a library like `g2o` to optimize \( R \), \( t \), and 3D points, reducing drift.
+   - Expected Result: A more consistent and accurate map over the entire video.

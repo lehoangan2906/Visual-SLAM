@@ -67,7 +67,7 @@ def find_vanishing_points(lines_group, width, height):
     return np.mean(intersections, axis = 0)
 
 
-def estimate_intrinsic_matrix(video_path, num_frames=20, verbose=True):
+def estimate_intrinsic_matrix(video_path, num_frames=30, verbose=True):
     """
     Estimate the camera's intrinsic matrixs (K) using the vanishing point method.
 
