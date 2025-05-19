@@ -36,8 +36,8 @@ def extract_akaze_orb_features(img1, img2):
     
 
     # Initialize AKAZE and ORB detectors instances
-    akaze = cv2.AKAZE_create(threshold=0.0001, diffusivity=cv2.KAZE_DIFF_PM_G2)
-    orb = cv2.ORB_create(nfeatures=1500)
+    akaze = cv2.AKAZE_create(threshold=0.001, diffusivity=cv2.KAZE_DIFF_PM_G2)
+    orb = cv2.ORB_create(nfeatures=500)
 
 
     # ==================== Masking ====================
@@ -111,21 +111,24 @@ def extract_akaze_orb_features(img1, img2):
         return kp1, kp2, []
 
     # ===================== Feature Matching ====================
-
+    """
     # Create a FLANN matcher for binary descriptors
     FLANN_INDEX_LSH = 6 
     index_params = dict(algorithm=FLANN_INDEX_LSH, table_number=6, key_size=12, multi_probe_level = 1)
     search_params = dict(checks=50)
     matcher = cv2.FlannBasedMatcher(index_params, search_params)
-
+    """
+    
 
     # Create a brute-force matcher
-    # matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)  # Cross-check only enabled when using 1-NN matcher, using Hamming distance as the distance measurement.
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)  # Cross-check only enabled when using 1-NN matcher, using Hamming distance as the distance measurement.
 
     # Set the Lowe's ratio test threshold
     lowe_thres = 0.65
 
     # Compute the matches between the two frames' descriptors
+    """
+    # 2-NN matcher
     # Match AKAZE descriptors separately
     good_matches_akaze = []     # Placeholder for good matches
     if des1_akaze.shape[0] >= 2 and des2_akaze.shape[0] >= 2:
@@ -145,7 +148,26 @@ def extract_akaze_orb_features(img1, img2):
     if des1_road.shape[0] >= 2 and des2_road.shape[0] >= 2:
         matches_road = matcher.knnMatch(des1_road, des2_road, k=2)
         good_matches_road = [m[0] for m in matches_road if len(m) == 2 and m[0].distance < lowe_thres * m[1].distance]
+    """
 
+    # 1-NN matcher
+    good_matches_akaze = []
+    if des1_akaze.shape[0] >= 2 and des2_akaze.shape[0] >= 2:
+        matches_akaze = matcher.match(des1_akaze, des2_akaze)
+        matches_akaze = sorted(matches_akaze, key=lambda x: x.distance)
+        good_matches_akaze = matches_akaze 
+
+    good_matches_orb = []
+    if des1_orb.shape[0] >= 2 and des2_orb.shape[0] >= 2:
+        matches_orb = matcher.match(des1_orb, des2_orb)
+        matches_orb = sorted(matches_orb, key=lambda x: x.distance)
+        good_matches_orb = matches_orb
+
+    good_matches_road = []
+    if des1_road.shape[0] >= 2 and des2_road.shape[0] >= 2:
+        matches_road = matcher.match(des1_road, des2_road)
+        matches_road = sorted(matches_road, key=lambda x: x.distance)
+        good_matches_road = matches_road
 
     # Adjust ORB match indices to account for combined keypoint list
     num_akaze_kp1 = len(kp1_akaze)

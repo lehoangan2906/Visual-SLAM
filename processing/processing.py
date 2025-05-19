@@ -44,9 +44,19 @@ def normalize_coordinates(pts, K):
     return pts_norm
 
 
-def compute_essential_matrix(pts1, pts2, k):
+def compute_essential_matrix_5pt(pts1, pts2, K):
     """
     Estimate essential matrix using OpenCV's 5-point algorithm with RANSAC.
+
+    The 5-point algorithm estimates the essential matrix E using only 5 point correspondences between two images taken from a calibrated camera (with known intrinsics K).
+    - Unlike the 8-point algorithm, which solves a linear system directly.
+    The 5-point algorithm solves a non-linear system that leverages epipolar constraints and geometric properties of E.
+
+    It's more accurate for calibrated cameras and better reflects the underlying camera motion.
+
+
+    Though the matches are already filtered by RANSAC once (assuming unknown intrinsics), some of them may still be outliers. We need to filter them out one more time after 5-point algorithm (uses the known intrinsics K) to ensure that the remaining matches fit your camera's model (with known intrinsics).
+
 
     Args: 
         pts1, pts2: Arrays of shape (N, 2) containing pixel coordinates [x, y].
@@ -70,9 +80,7 @@ def compute_essential_matrix(pts1, pts2, k):
     return E, mask
 
 
-
-"""
-def compute_essential_matrix(pts1, pts2):
+def compute_essential_matrix_8pt(pts1, pts2):
     """
     Compute the essential matrix using the 8-point algorithm.
 
@@ -107,7 +115,6 @@ def compute_essential_matrix(pts1, pts2):
     E /= np.linalg.norm(E)
 
     return E
-"""
 
 
 def decompose_essential_matrix(E, pts1, pts2, K):
@@ -336,6 +343,8 @@ def play_video(video_path, K):
 
     # Read and process frames until the video ends
     frame_count = 0
+    skip_every_n_frames = 3    # Adjust this to 2, 3, or 4 for performance trade-off
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -343,6 +352,9 @@ def play_video(video_path, K):
 
         # Increment frame counter
         frame_count += 1
+        if frame_count % skip_every_n_frames != 0:
+            continue   # Skip frames for performance
+
 
         # Downscale the frame to reduce computational load
         frame = cv2.resize(frame, (frame.shape[1]//4, frame.shape[0]//4))
@@ -429,7 +441,7 @@ def process_frame(img, K):
         """
 
         # Compute essential matrix using OpenCV's 5-point algorithm directly from pixel coordinates
-        E, inlier_mask = compute_essential_matrix(pts1, pts2, K)
+        E, inlier_mask = compute_essential_matrix_5pt(pts1, pts2, K)
 
         # Filter matches based on inliers
         if inlier_mask is not None:
@@ -444,6 +456,10 @@ def process_frame(img, K):
             camera_poses.append((R, t))
             print(f"Frame {len(camera_poses)} - Rotation Matrix:\n{R}")
             print(f"Frame {len(camera_poses)} - Translation Vector:\n{t}")
+
+            
+            pts1_norm = normalize_coordinates(pts1, K)
+            pts2_norm = normalize_coordinates(pts2, K)
 
 
             # Triangulate 3D points
