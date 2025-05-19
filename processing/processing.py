@@ -44,6 +44,34 @@ def normalize_coordinates(pts, K):
     return pts_norm
 
 
+def compute_essential_matrix(pts1, pts2, k):
+    """
+    Estimate essential matrix using OpenCV's 5-point algorithm with RANSAC.
+
+    Args: 
+        pts1, pts2: Arrays of shape (N, 2) containing pixel coordinates [x, y].
+        k: 3x3 intrinsic matrix.
+
+    Returns:
+        E: 3x3 Essential Matrix.
+        mask: Inlier mask from RANSAC
+    """
+
+    if pts1.shape[0] < 5: 
+        print("Not enough points for 5-point algorithm.")
+        return None, None
+
+    E, mask = cv2.findEssentialMat(pts1, pts2, K, method=cv2.RANSAC, threshold=1.0, prob=0.999)
+
+    if E is None:
+        print("Failed to compute essential matrix.")
+        return None, None
+
+    return E, mask
+
+
+
+"""
 def compute_essential_matrix(pts1, pts2):
     """
     Compute the essential matrix using the 8-point algorithm.
@@ -79,6 +107,7 @@ def compute_essential_matrix(pts1, pts2):
     E /= np.linalg.norm(E)
 
     return E
+"""
 
 
 def decompose_essential_matrix(E, pts1, pts2, K):
@@ -390,12 +419,23 @@ def process_frame(img, K):
         pts1 = np.array([kp1[m.queryIdx].pt for m in good_matches], dtype=np.float32)
         pts2 = np.array([kp2[m.trainIdx].pt for m in good_matches], dtype=np.float32)
 
+        """
         # Convert to normalized coordinates
         pts1_norm = normalize_coordinates(pts1, K)
         pts2_norm = normalize_coordinates(pts2, K)
 
-        # Compute essential matrix
+        # Compute essential matrix with 8-point algorithm
         E = compute_essential_matrix(pts1_norm, pts2_norm)
+        """
+
+        # Compute essential matrix using OpenCV's 5-point algorithm directly from pixel coordinates
+        E, inlier_mask = compute_essential_matrix(pts1, pts2, K)
+
+        # Filter matches based on inliers
+        if inlier_mask is not None:
+            pts1 = pts1[inlier_mask.ravel() == 1]
+            pts2 = pts2[inlier_mask.ravel() == 1]
+            good_matches = [m for i, m in enumerate(good_matches) if inlier_mask[i]] 
 
         # Decompose into R and t
         R, t = decompose_essential_matrix(E, pts1, pts2, K)
