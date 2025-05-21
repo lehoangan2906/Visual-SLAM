@@ -14,6 +14,27 @@ camera_poses = []  # List to store camera poses (R, t) for each frame
 map_points = []    # List to store 3D points and their associations
 
 
+def compose_global_pose(prev_R, prev_t, rel_R, rel_t):
+    """
+    Compose the global pose of each frame relative to the first frame using 
+    the previous global pose and the relative pose.
+
+    Args:
+        prev_R (np.ndarray): Previous global rotation matrix.
+        prev_t (np.ndarray): Previous global translation vector.
+        rel_R (np.ndarray): Relative rotation matrix.
+        rel_t (np.ndarray): Relative translation vector.
+    Returns:
+        global_R (np.ndarray): Global rotation matrix.
+        global_t (np.ndarray): Global translation vector.
+    """
+
+    new_R = prev_R @ rel_R
+    new_t = prev_t + prev_R @ rel_t
+    return new_R, new_t
+
+
+
 def normalize_coordinates(pts, K):
     """
     Convert pixel coordinates to normalized camera coordinates using K^-1.
@@ -283,13 +304,16 @@ def visualize_map():
 
 
     # Compute global camera poses by accumulating relative poses
+    """
     global_poses = [(np.eye(3), np.zeros((3, 1)))]  # Start with identity for the first frame
     for R, t in camera_poses[1:]:
         prev_R, prev_t = global_poses[-1]
         new_R = prev_R @ R
         new_t = prev_t + prev_R @ t
         global_poses.append((new_R, new_t))
+    """
 
+    global_poses = camera_poses
 
     # Extract camera positions
     camera_positions = np.array([pose[1].flatten() for pose in global_poses])
@@ -453,7 +477,13 @@ def process_frame(img, K):
         R, t = decompose_essential_matrix(E, pts1, pts2, K)
 
         if R is not None and t is not None:
-            camera_poses.append((R, t))
+            
+            # Use global pose for each frame relative to the first frame to avoid drift
+            prev_R, prev_t = camera_poses[-1]   # Previous camera pose
+            new_R, new_t = compose_global_pose(prev_R, prev_t, R, t)  # Global pose for the current frame
+            camera_poses.append((new_R, new_t))
+            
+            #camera_poses.append((R, t))
             print(f"Frame {len(camera_poses)} - Rotation Matrix:\n{R}")
             print(f"Frame {len(camera_poses)} - Translation Vector:\n{t}")
 
@@ -463,7 +493,7 @@ def process_frame(img, K):
 
 
             # Triangulate 3D points
-            points_3d, valid_mask = triangulate_points(pts1_norm, pts2_norm, R, t)
+            points_3d, valid_mask = triangulate_points(pts1_norm, pts2_norm, new_R, new_t)
 
 
             # Store valid 3D points with their associations
