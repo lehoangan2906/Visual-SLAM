@@ -27,17 +27,110 @@ def preprocess_image(img):
     return blended, enhanced    # Return both blended (for AKAZE/ORB) and enhanced (for goodFeaturesToTrack)
 
 
+# Detect road-specific keypoints using GoodFeaturesToTrack
+def detect_road_corners(img_enhanced, orb=None, max_corners=500, quality_level=0.01, min_distance=10, orb_nfeatures=None):
+    """
+        Detect road-specific corners using goodFeaturesToTrack on the enhanced grayscale image, then compute ORb descriptors for them.
+        This function is used to detect road-specific features like lane markings and curbs.
+
+    Args:
+        img_enhanced (np.ndarray): Enhanced grayscale image for corner detection.
+        orb (cv2.ORB, optional): Pre-initialized ORB detector. If None, one will be created.
+        max_corners (int): Maximum number of corners to detect.
+        quality_level (float): Quality level for GFTT.
+        min_distance (int): Minimum distance between detected corners.
+        orb_nfeatures (int): Number of features to detect with ORB.
+
+    Returns:
+        keypoints (list of cv2.KeyPoint): Detected keypoints.
+        descriptors (np.ndarray): ORB descriptors for those keypoints.
+    """
+    if orb is None:
+        orb = cv2.ORB_create(nfeatures=orb_nfeatures)
+
+    corners = cv2.goodFeaturesToTrack(
+            img_enhanced, maxCorners=max_corners, 
+            qualityLevel=quality_level, minDistance=min_distance
+    )
+
+    if corners is None:
+        return [], np.array([], dtype=np.uint8).reshape(0, 32)
+
+    # Convert corners to keypoints
+    keypoints = [cv2.KeyPoint(x=c[0][0], y=c[0][1], size=10) for c in corners]
+
+    # Compute ORB descriptors for these keypoints because goodFeaturesToTrack does not compute descriptors
+    _, descriptors = orb.compute(img_enhanced if keypoints else None, keypoints)
+
+    return keypoints, descriptors
+
+
+# Extract feature similar to the extract_akaze_orb_features function, but without the matching part.
+def extract_features_single(img, akaze_thres, orb_nfeatures):
+    """
+        Extract features from a single image using a combination of AKAZE, ORB, and goodfeaturestotrack.
+        This function is used for the first frame only.
+
+        Args:
+            img (numpy.ndarray): The input image from which to extract features.
+            akaze_thres (float): The threshold for AKAZE feature detection.
+            orb_nfeatures (int): The number of features to detect with ORB.
+
+        Returns:
+            A dictionary with keypoints and descriptors per detector:
+            {
+                "akaze": (keypoints, descriptors),
+                "orb": (keypoints, descriptors),
+                "road": (keypoints, descriptors)
+            }
+
+            We need to separate them per detector to avoid confusion in the matching step.
+            When combining keypoints from multiple detectors (AKAZE + ORB + road), their descriptors come from different spaces:
+            - AKAZE descriptors are 61-dimensional.
+            - ORB descriptors are 32-dimensional.
+            - Road-specific descriptors are also 32-dimensional.
+            Matching must be done per-detector to ensure correct descriptor dimensions.
+    """
+
+    # preprocess the image
+    img_preprocessed, img_enhanced = preprocess_image(img)
+
+    # Initialize AKAZE and ORB detectors
+    akaze = cv2.AKAZE_create(threshold=akaze_thres, diffusivity=cv2.KAZE_DIFF_PM_G2)
+    orb = cv2.ORB_create(nfeatures=orb_nfeatures)
+
+    # ==================== Masking ====================
+    mask = None     # No mask is applied in this case, but can be added if needed
+
+    # ==================== Feature Detection ====================
+    kp_akaze, des_akaze = akaze.detectAndCompute(img_preprocessed, mask)
+    kp_orb, des_orb = orb.detectAndCompute(img_preprocessed, mask)
+    kp_road, des_road = detect_road_corners(img_enhanced, orb, orb_nfeatures=orb_nfeatures)
+
+    # Handle empty descriptors
+    if des_akaze is None:
+        des_akaze = np.array([], dtype=np.uint8).reshape(0, 61)
+    if des_orb is None:
+        des_orb = np.array([], dtype=np.uint8).reshape(0, 32)
+    if des_road is None:
+        des_road = np.array([], dtype=np.uint8).reshape(0, 32)
+
+    return {
+            "akaze": (kp_akaze or [], des_akaze),
+            "orb": (kp_orb or [], des_orb),
+            "road": (kp_road or [], des_road)
+            }
 
 # Extract feature using a combination of AKAZE and ORB
-def extract_akaze_orb_features(img1, img2):
+def extract_akaze_orb_features(img1, img2, akaze_thres, orb_nfeatures):
     # Preprocess the frames to enhance road features
     img1_preprocessed, img1_enhanced = preprocess_image(img1)
     img2_preprocessed, img2_enhanced = preprocess_image(img2)
     
 
     # Initialize AKAZE and ORB detectors instances
-    akaze = cv2.AKAZE_create(threshold=0.001, diffusivity=cv2.KAZE_DIFF_PM_G2)
-    orb = cv2.ORB_create(nfeatures=500)
+    akaze = cv2.AKAZE_create(threshold=akaze_thres, diffusivity=cv2.KAZE_DIFF_PM_G2)
+    orb = cv2.ORB_create(nfeatures=orb_nfeatures)
 
 
     # ==================== Masking ====================
@@ -56,29 +149,15 @@ def extract_akaze_orb_features(img1, img2):
     
     # ==================== Feature Extraction ====================
 
-    # Separately detect keypoints and descriptors with AKAZE and ORB
+    # Separately detect keypoints and descriptors with AKAZE, ORB, and goodFeaturesToTrack
     kp1_akaze, des1_akaze = akaze.detectAndCompute(img1_preprocessed, mask)
     kp2_akaze, des2_akaze = akaze.detectAndCompute(img2_preprocessed, mask)
 
     kp1_orb, des1_orb = orb.detectAndCompute(img1_preprocessed, mask)
     kp2_orb, des2_orb = orb.detectAndCompute(img2_preprocessed, mask)
-
-   
-    # Detect road-specific keypoints using GoodFeaturesToTrack
-    def detect_road_corners(img_enhanced):
-        # Detect corners using goodFeaturesToTrack on the enhanced grayscale image
-        corners = cv2.goodFeaturesToTrack(img_enhanced, maxCorners=500, qualityLevel=0.01, minDistance=10)
-        if corners is None:
-            return [], np.array([], dtype=np.uint8).reshape(0, 32)
-        # Convert corners to keypoints
-        keypoints = [cv2.KeyPoint(x=c[0][0], y=c[0][1], size=10) for c in corners]
-        # Compute ORB descriptors for these keypoints
-        _, descriptors = orb.compute(img1 if keypoints else None, keypoints)
-        return keypoints, descriptors 
-
     
-    kp1_road, des1_road = detect_road_corners(img1_enhanced)
-    kp2_road, des2_road = detect_road_corners(img2_enhanced)
+    kp1_road, des1_road = detect_road_corners(img1_enhanced, orb, orb_nfeatures)
+    kp2_road, des2_road = detect_road_corners(img2_enhanced, orb, orb_nfeatures)
 
     # Convert all keypoints to lists for consistent concatenation
     kp1_akaze = list(kp1_akaze) if kp1_akaze is not None else []
